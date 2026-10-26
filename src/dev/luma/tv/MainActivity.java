@@ -245,7 +245,16 @@ public final class MainActivity extends Activity {
     /** Colours of the parts that stay across pages: tab bar, clock and the settings scrim. */
     private void paintChrome(){
         // The tab bar is one translucent capsule with a hairline rim, as on tvOS 26; only the selected tab is opaque.
-        if(tabBar!=null){GradientDrawable bar=shape(light?0x4DFFFFFF:0x1FFFFFFF,22);bar.setStroke(Math.max(1,px(.6f)),light?0x80FFFFFF:0x26FFFFFF);tabBar.setBackground(bar);}
+        // The tab bar after the owner's reference (cinejoy.pk's nav): a smoked-glass capsule, rgba(14,14,16,.38) with a
+        // 1px white 7% border and a 1px inner highlight on top; denser on the pale wallpaper so white labels stay legible.
+        // The wallpaper behind it is already blurred, so no live backdrop blur is needed.
+        if(tabBar!=null){
+            GradientDrawable fill=shape(light?0x9E0E0E10:0x610E0E10,24);fill.setStroke(Math.max(1,px(.5f)),light?0x1FFFFFFF:0x12FFFFFF);
+            GradientDrawable highlight=shape(Color.TRANSPARENT,24);highlight.setStroke(Math.max(1,px(.5f)),light?0x24FFFFFF:0x12FFFFFF);
+            LayerDrawable bar=new LayerDrawable(new Drawable[]{fill,highlight});bar.setLayerInset(1,0,Math.max(1,px(.5f)),0,0);
+            tabBar.setBackground(bar);tabBar.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View v,Outline o){o.setRoundRect(0,0,v.getWidth(),v.getHeight(),px(24));o.setAlpha(.5f);}});
+            tabBar.setElevation(px(8));
+        }
         if(clock!=null){clock.setTextColor(ink(0xF2));shadow(clock,6);}
         if(sceneryShade!=null)sceneryShade.setBackgroundColor(light?0x73F2F2F5:0x80000000);
     }
@@ -264,8 +273,8 @@ public final class MainActivity extends Activity {
         String[] pages = {"home", "apps", "settings"};
         for (int i=0;i<titles.length;i++) {
             final int index=i;
-            TextView tab = text(titles[i], 14, 0xB3FFFFFF, "sans-serif-medium");
-            tab.setPadding(px(17), px(9), px(17), px(9)); tab.setGravity(Gravity.CENTER);
+            TextView tab = text(titles[i], 15, 0xB3FFFFFF, "sans-serif-medium");
+            tab.setPadding(px(22), 0, px(22), 0); tab.setGravity(Gravity.CENTER);
             tab.setFocusable(true); tab.setFocusableInTouchMode(true); tab.setSoundEffectsEnabled(false);
             tab.setOnClickListener(v -> { sound(); enterContent(index); }); // OK does what Down does
             // One pill slides between tabs; leaving the bar it settles, translucent, on the current page. Up from
@@ -284,13 +293,13 @@ public final class MainActivity extends Activity {
             tabs.add(tab); navigation.addView(tab, new LinearLayout.LayoutParams(-2, px(36)));
         }
         FrameLayout bar = new FrameLayout(this); bar.setClipChildren(false); bar.setClipToPadding(false); tabBar=bar; // the pill's shadow is not cut at the padding
-        // The pill sits 4 in from every edge of the bar, so its curve runs parallel to the bar's (radius 18 in 22).
+        // The pill sits 6 in from every edge of the bar, so its curve runs parallel to the bar's (radius 18 in 24).
         tabIndicatorShape = shape(0x24FFFFFF, 18); tabIndicator = new View(this); tabIndicator.setBackground(tabIndicatorShape);
         bar.addView(tabIndicator, new FrameLayout.LayoutParams(0, px(36), Gravity.CENTER_VERTICAL));
         bar.addView(navigation, new FrameLayout.LayoutParams(-2, -1));
         navigation.setElevation(px(8)); // the labels stay above the lifted pill; with no background it casts no shadow
-        bar.setPadding(px(4),px(4),px(4),px(4));
-        root.addView(bar, pos(-2, 44, 0, 24));
+        bar.setPadding(px(6),px(6),px(6),px(6));
+        root.addView(bar, pos(-2, 48, 0, 22));
         bar.post(()->{ bar.setTranslationX((getResources().getDisplayMetrics().widthPixels-bar.getWidth())/2f); moveTabIndicator(false); });
         root.getViewTreeObserver().addOnGlobalFocusChangeListener((old,now)->{
             focusFromContent=within(old,content);
@@ -637,9 +646,9 @@ public final class MainActivity extends Activity {
         int focused=focusedTab(),index=focused>=0?focused:pageTab();View target=tabs.get(index),row=(View)target.getParent();
         if(target.getWidth()==0){target.post(()->moveTabIndicator(false));return;}
         final float fromX=tabIndicator.getTranslationX(),toX=row.getLeft()+target.getLeft()-((View)row.getParent()).getPaddingLeft();
-        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?Color.WHITE:(light?0x99FFFFFF:0x33FFFFFF);
-        final float fromZ=tabIndicator.getElevation(),toZ=focused>=0?px(5):0; // focused: opaque white with a soft drop shadow; selected: lighter glass
-        final int onPill=focused>=0?0xFF1D1D1F:ink(0xFF),offPill=ink(0x99);
+        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?Color.WHITE:0x2EFFFFFF;
+        final float fromZ=tabIndicator.getElevation(),toZ=focused>=0?px(4):0; // focused: solid white with a small drop shadow (0 2px 8px); selected: a faint white glass pill
+        final int onPill=focused>=0?0xFF0E0E10:Color.WHITE,offPill=light?0xB3FFFFFF:0x99FFFFFF;
         if(tabMove!=null)tabMove.cancel();
         ArgbEvaluator argb=new ArgbEvaluator();
         ValueAnimator.AnimatorUpdateListener step=a->{float f=(float)a.getAnimatedValue();
