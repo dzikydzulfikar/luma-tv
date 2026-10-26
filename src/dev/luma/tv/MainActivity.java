@@ -4,6 +4,7 @@ import android.app.*;
 import android.animation.*;
 import android.content.*;
 import android.content.pm.*;
+import android.database.Cursor;
 import android.graphics.*;
 import android.graphics.drawable.*;
 import android.net.Uri;
@@ -52,21 +53,29 @@ public final class MainActivity extends Activity {
     private boolean house;
     /** Home pages of widgets chosen in Settings (WidgetBoard); homePage is the page shown, kept across rebuilds. */
     private WidgetBoard board;
-    /** Windah's streams, in a row below the first screen of Home. */
-    private Shelf shelf;
+    /** Windah's streams, in a row below the first screen of Home, and Recommended for You under it. */
+    private Shelf shelf,recommended;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=548,SCROLL=330;
-    private boolean scrolledDown;
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=548,SCROLL=330,ROW_STEP=250;
+    private boolean scrolledDown;private int scrollLevel;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
-    private void scrollHome(boolean down){
-        if(down==scrolledDown||!page.equals("home"))return;scrolledDown=down;
-        float y=down?-px(SCROLL):0;long ms=motion()?420:0;
+    private void scrollHome(boolean down){scrollHome(down?1:0);}
+    /** Level 0: the first screen; 1: Windah's row (Recommended peeks below); 2: Recommended for You. */
+    private void scrollHome(int level){
+        if(level==scrollLevel||!page.equals("home"))return;scrollLevel=level;boolean down=level>0;scrolledDown=down;
+        float y=level==0?0:-px(SCROLL+(level-1)*ROW_STEP);long ms=motion()?420:0;
         content.animate().cancel();content.animate().translationY(y).setDuration(ms).setInterpolator(decelerate).start();
         if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
         tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
     }
     private final Shelf.Host shelfHost=new Shelf.Host(){
         public void up(){scrollHome(false);focusFirst();}
+        public void down(){if(recommended!=null&&!recommended.empty()&&recommended.focusCurrent())scrollHome(2);}
+        public boolean light(){return light;}
+        public int px(float value){return MainActivity.this.px(value);}
+    };
+    private final Shelf.Host recommendedHost=new Shelf.Host(){
+        public void up(){if(shelf!=null&&shelf.focusCurrent())scrollHome(1);}
         public void down(){}
         public boolean light(){return light;}
         public int px(float value){return MainActivity.this.px(value);}
@@ -157,7 +166,7 @@ public final class MainActivity extends Activity {
         wallpaper.syncAmbient();
         if(houseWidgets!=null)houseWidgets.setActive(board==null||board.onHouse());
         if(board!=null){board.setActive(true);board.refresh();}
-        if(shelf!=null)shelf.refresh();
+        if(shelf!=null)shelf.refresh();if(recommended!=null)recommended.refresh();
     }
     @Override protected void onPause() {
         super.onPause(); if(houseWidgets!=null)houseWidgets.setActive(false); if(board!=null)board.setActive(false); started = false; handler.removeCallbacks(clockTick); handler.removeCallbacks(daylightTick);
@@ -187,6 +196,11 @@ public final class MainActivity extends Activity {
     @Override public void dump(String prefix,FileDescriptor fd,PrintWriter writer,String[] args) {
         super.dump(prefix,fd,writer,args);
         if(wallpaper!=null)writer.println(prefix+"Luma ambient: running="+wallpaper.ambientRunning+" ticks="+wallpaper.ambientTicks+" seconds="+wallpaper.ambientSeconds+" style="+wallpaper.requestedStyle+" page="+page);
+        // QA: what Watch Next this app can see (adb shell dumpsys activity dev.luma.tv/.MainActivity).
+        try(Cursor c=getContentResolver().query(UpNextWidget.WATCH_NEXT,new String[]{"package_name","title","last_playback_position_millis","duration_millis"},null,null,null)){
+            writer.println(prefix+"Luma watch next: rows="+(c==null?"null":c.getCount()));
+            while(c!=null&&c.moveToNext()&&c.getPosition()<20)writer.println(prefix+"  "+c.getString(0)+" | "+c.getString(1)+" | "+c.getLong(2)+"/"+c.getLong(3));
+        }catch(RuntimeException e){writer.println(prefix+"Luma watch next: "+e);}
         if(daylight!=null){long now=System.currentTimeMillis();long[] sun=daylight.times(now);SimpleDateFormat f=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US);
             writer.println(prefix+"Luma daylight: zone="+TimeZone.getDefault().getID()+" sunrise="+f.format(new Date(sun[0]))+" sunset="+f.format(new Date(sun[1]))+" day="+daylight.isDay(now)+" next="+f.format(new Date(daylight.nextChange(now)))+" light="+light);}
     }
@@ -305,7 +319,7 @@ public final class MainActivity extends Activity {
         bar.post(()->{ bar.setTranslationX((getResources().getDisplayMetrics().widthPixels-bar.getWidth())/2f); moveTabIndicator(false); });
         root.getViewTreeObserver().addOnGlobalFocusChangeListener((old,now)->{
             focusFromContent=within(old,content);
-            if(within(now,content)&&!within(now,shelf)){String key=focusKey(now);if(key!=null)lastFocus.put(page,key);else lastFocus.remove(page);lastView.put(page,now);}
+            if(within(now,content)&&!within(now,shelf)&&!within(now,recommended)){String key=focusKey(now);if(key!=null)lastFocus.put(page,key);else lastFocus.remove(page);lastView.put(page,now);}
             if(android.util.Log.isLoggable("LumaFocus",android.util.Log.DEBUG))android.util.Log.d("LumaFocus",page+" "+describe(now));
         });
         clock = text("", 18, 0xF2FFFFFF, "sans-serif-medium"); clock.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL); clock.setLetterSpacing(.01f);
@@ -393,7 +407,7 @@ public final class MainActivity extends Activity {
         content.animate().cancel();content.setAlpha(1);content.setTranslationX(0);content.setTranslationY(0);scrolledDown=false;tabBar.animate().cancel();tabBar.setAlpha(1);
         if(houseWidgets!=null&&houseWidgets.current!=null)lastHome=houseWidgets.current;
         if(board!=null)homePage=board.index;
-        content.removeAllViews();houseWidgets=null;board=null;shelf=null;content.setTag(null);
+        content.removeAllViews();houseWidgets=null;board=null;shelf=null;recommended=null;scrollLevel=0;content.setTag(null);
         page=next;homeGreeting=page.equals("home");heroPackage=homeGreeting?"@greeting":"";tiles.clear();
         light=pale(variant(wallpaperStyle()));paintChrome();
         clock.setVisibility(prefs.getBoolean("clock", true) && !page.equals("home") ? View.VISIBLE : View.GONE); // Home has its own clock card
@@ -416,7 +430,8 @@ public final class MainActivity extends Activity {
         boolean housePage=false;for(ArrayList<String> p:layout)housePage|=p.contains("house");
         content.addView(hero,pos(864,88,48,home?(!layout.isEmpty()?96:272):100));
         heroKey=home?"@greeting":"";
-        if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost);content.addView(shelf,pos(960,240,0,SHELF_Y));}
+        if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost,Shelf.WINDAH);content.addView(shelf,pos(960,240,0,SHELF_Y));
+            recommended=new Shelf(this,recommendedHost,Shelf.RECOMMENDED);content.addView(recommended,pos(960,240,0,SHELF_Y+ROW_STEP));}
         if(home&&housePage){
             houseWidgets=new HouseWidgets(this,unit,new HouseWidgets.Callbacks(){
                 public void up(){tabs.get(0).requestFocus();}
@@ -1122,7 +1137,7 @@ public final class MainActivity extends Activity {
         if (overlay!=null) { closeOverlay(true); return; }
         int tab=focusedTab();
         if (tab>=0) { if(tab!=0) tabs.get(0).requestFocus(); return; }
-        if (page.equals("home")) { if(board!=null&&board.index>0) board.showPage(0); if(scroll!=null&&scroll.getScrollY()>0) scrollHome(false); }
+        if (page.equals("home")) { if(board!=null&&board.index>0) board.showPage(0); scrollHome(0); } // the rows below slide away, the tabs come back
         tabs.get(pageTab()).requestFocus();
     }
 

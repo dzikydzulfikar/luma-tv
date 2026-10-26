@@ -22,6 +22,11 @@ public final class StreamsTest {
         String feed="<feed><title>Windah</title><entry><yt:videoId>FEEDVIDEO01</yt:videoId><title>A &amp; B</title></entry></feed>";
         List<Streams.Video> f=Streams.parseFeed(feed,10);
         check(f.size()==1&&f.get(0).title.equals("A & B")&&f.get(0).thumb.contains("FEEDVIDEO01"),"feed");
+        String rich="<feed><entry><yt:videoId>FEEDVIDEO02</yt:videoId><title>Talk</title><link rel=\"alternate\" href=\"https://www.youtube.com/watch?v=FEEDVIDEO02\"/><author><name>Cursor</name></author><published>2026-09-03T17:00:00+00:00</published></entry>"
+            +"<entry><yt:videoId>SHORTVIDEO1</yt:videoId><title>Short</title><link rel=\"alternate\" href=\"https://www.youtube.com/shorts/SHORTVIDEO1\"/></entry></feed>";
+        List<Streams.Video> r=Streams.parseFeed(rich,10);
+        check(r.size()==1&&"Cursor".equals(r.get(0).channel),"channel name, shorts left out: "+r.size());
+        check(r.get(0).published==1788454800000L,"published time: "+r.get(0).published);
         System.out.println(failures==0?"all ok":failures+" failed");
         if(failures>0)System.exit(1);
     }

@@ -22,7 +22,7 @@ print('<resources><string name="greeting">' + text + '</string></resources>')
 PY
 "$BT/aapt2" compile --dir res -o build/resources.zip
 "$BT/aapt2" compile --dir build/overlay -o build/overlay.zip
-"$BT/aapt2" link -o build/resources.apk -I "$ANDROID_JAR" --manifest AndroidManifest.xml --java build/generated --auto-add-overlay build/resources.zip -R build/overlay.zip
+"$BT/aapt2" link -o build/resources.apk -I "$ANDROID_JAR" --manifest AndroidManifest.xml --java build/generated --auto-add-overlay build/resources.zip -R build/overlay.zip -A assets
 find src build/generated -name '*.java' > build/sources.txt
 javac -encoding UTF-8 --release 8 -classpath "$ANDROID_JAR" -d build/classes @build/sources.txt
 find build/classes -name '*.class' > build/classes.txt

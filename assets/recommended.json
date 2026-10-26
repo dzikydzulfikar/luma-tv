@@ -1,0 +1,20 @@
+{
+  "_about": "Recommended for You on Home: AI and tech. Pins come first, then the newest videos of these channels (public RSS, no account, no API key), deduplicated, newest first. Channel IDs and pins were checked on 2026-10-26. Edit, rebuild, reinstall.",
+  "max": 15,
+  "perChannel": 4,
+  "refreshHours": 6,
+  "pins": [
+    {"id": "AQnwQHMnCrE", "title": "Elon Musk: The End of Work, the Death of Money, and a World Run by AI", "channel": "The Builders"},
+    {"id": "anAmTGcewX8", "title": "Sam Altman, Co-Founder and CEO of OpenAI: Staying Human While Scaling Superintelligence", "channel": "Stanford Graduate School of Business"},
+    {"id": "rkigdXf-52I", "title": "Meet Grok Bot: Your Team of AI Agents", "channel": "Cursor"}
+  ],
+  "channels": [
+    {"name": "Cursor", "id": "UC6YYHJzM6PhZ2Yey9BQiUaw"},
+    {"name": "OpenAI", "id": "UCXZCJLdBC09xxGZ6gcdrc6A"},
+    {"name": "Grok (xAI)", "id": "UCxgo0OMZU9SiaYpJsuZKWkQ"},
+    {"name": "The Builders (Walter Isaacson)", "id": "UCG76YUwXNM4_1eIJr83rKJQ"},
+    {"name": "Lex Fridman", "id": "UCSHZKyawb77ixDdsGog4iWA"},
+    {"name": "Y Combinator", "id": "UCcefcZRL2oaA_uBNeo5UOWg"},
+    {"name": "Tesla", "id": "UC5WjFrtBdufl6CZojX3D8dQ"}
+  ]
+}
