@@ -19,6 +19,15 @@
   Made by <a href="https://x.com/0xProbabillity">@0xProbabillity</a>
 </p>
 
+> [!NOTE]
+> **This is a personal fork** (branch `dziky`) of [0xProbabillity/luma-tv](https://github.com/0xProbabillity/luma-tv),
+> tuned for one Xiaomi TV Box toward the Apple TV home: every app shows its own HD TV banner as a 5:3 icon,
+> Home is a clock card and the weather over one row of apps (YouTube, Netflix, Apple TV, Prime Video, Settings),
+> Down reveals a row of Windah Basudara's live and recent streams (public page, no API key, cached), Silver stays
+> light, focus moves like tvOS (damped lift, one-shot tilt, gloss), tabs switch as focus lands, and the screensaver
+> plays Apple TV aerials downloaded at run time (nothing bundled). All credit for Luma goes to its author; the
+> licence below still applies.
+
 ## What it does
 
 Luma works on its own: it needs no smart home, account or other app. Everything below except the scene block
