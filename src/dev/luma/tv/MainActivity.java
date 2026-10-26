@@ -52,11 +52,22 @@ public final class MainActivity extends Activity {
     private boolean house;
     /** Home pages of widgets chosen in Settings (WidgetBoard); homePage is the page shown, kept across rebuilds. */
     private WidgetBoard board;
-    /** Home's top shelf of Windah's streams. */
+    /** Windah's streams, in a row below the first screen of Home. */
     private Shelf shelf;
+    /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
+    private static final float TILE_W=150,TILE_H=90,RADIUS=11,SHELF_Y=548,SCROLL=330;
+    private boolean scrolledDown;
+    /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
+    private void scrollHome(boolean down){
+        if(down==scrolledDown||!page.equals("home"))return;scrolledDown=down;
+        float y=down?-px(SCROLL):0;long ms=motion()?420:0;
+        content.animate().cancel();content.animate().translationY(y).setDuration(ms).setInterpolator(decelerate).start();
+        if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
+        tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
+    }
     private final Shelf.Host shelfHost=new Shelf.Host(){
-        public void up(){tabs.get(0).requestFocus();}
-        public void down(){focusFirst();}
+        public void up(){scrollHome(false);focusFirst();}
+        public void down(){}
         public boolean light(){return light;}
         public int px(float value){return MainActivity.this.px(value);}
     };
@@ -91,9 +102,18 @@ public final class MainActivity extends Activity {
             handler.postDelayed(this, 15000);
         }
     };
-    /** The Windah Live card: not an installed app, it opens the channel's live page in the YouTube app. */
-    static final String WINDAH="luma.windah";
-    private static final String[] FIRST = {"com.google.android.youtube.tv", WINDAH, "com.netflix.ninja", "com.apple.atve.androidtv.appletv", "com.amazon.amazonvideo.livingroom", "com.android.vending", "com.android.tv.settings"};
+    private static final String[] FIRST = {"com.google.android.youtube.tv", "com.netflix.ninja", "com.apple.atve.androidtv.appletv", "com.amazon.amazonvideo.livingroom", "com.android.tv.settings", "com.android.vending"};
+    /** Columns of the app grid, as on tvOS: five wide icons per row. */
+    private static final int COLS=5;
+    /** Focused icon scale, close to tvOS. */
+    private static final float LIFT=1.13f;
+    private final android.view.animation.Interpolator decelerate=new DecelerateInterpolator(1.6f);
+    /** A spring damped almost critically: the lift settles without a visible bounce. */
+    private final android.view.animation.Interpolator settle=t->{
+        if(t>=1)return 1;
+        double time=t*.42,frequency=20,damping=.9,damped=frequency*Math.sqrt(1-damping*damping);
+        return (float)(1-Math.exp(-damping*frequency*time)*(Math.cos(damped*time)+damping*frequency/damped*Math.sin(damped*time)));
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -119,7 +139,7 @@ public final class MainActivity extends Activity {
         resetSceneTransition();
         handler.removeCallbacks(clockTick);
         handler.post(clockTick);
-        if(loaded && page.equals("home")){selectedPackage="com.google.android.youtube.tv";showGreeting();root.post(()->{holdGreeting=true;focusFirst();});}
+        if(loaded && page.equals("home")){scrollHome(false);selectedPackage="com.google.android.youtube.tv";showGreeting();root.post(()->{holdGreeting=true;focusFirst();});}
         if (loaded) discover();
         syncHouse();
         // A sunrise or sunset that passed while an app was open switches a moment after Home returns, once that
@@ -167,7 +187,7 @@ public final class MainActivity extends Activity {
     private int px(float value) { return Math.round(value * unit); }
     private boolean motion() { return prefs.getBoolean("motion", true) && ValueAnimator.areAnimatorsEnabled(); }
     private void sound() { if (prefs.getBoolean("sound", true)) sonic.open(); }
-    private void navigationSound(int index) { if(prefs.getBoolean("sound",true))sonic.step((index%6)/5f,lastDirectionX+lastDirectionY); }
+    private void navigationSound(int index) { if(prefs.getBoolean("sound",true))sonic.step((index%COLS)/(COLS-1f),lastDirectionX+lastDirectionY); }
     private TextView text(String value, float size, int color, String family) {
         TextView view = new TextView(this);
         view.setText(value); view.setTextColor(color);
@@ -237,10 +257,10 @@ public final class MainActivity extends Activity {
             tab.setFocusable(true); tab.setFocusableInTouchMode(true); tab.setSoundEffectsEnabled(false);
             tab.setOnClickListener(v -> { sound(); showPage(pages[index], true); });
             // One pill slides between tabs; leaving the bar it settles, translucent, on the current page.
-            tab.setOnFocusChangeListener((v, focus) -> { if(focus) moveTabIndicator(true); else tab.post(()->{ if(focusedTab()<0) moveTabIndicator(true); }); });
+            tab.setOnFocusChangeListener((v, focus) -> { if(focus){ moveTabIndicator(true); if(loaded&&!page.equals(pages[index])){ navigationSound(index); showPage(pages[index], false); } } else tab.post(()->{ if(focusedTab()<0) moveTabIndicator(true); }); });
             tab.setOnKeyListener((v,key,e) -> {
                 if (e.getAction()==KeyEvent.ACTION_DOWN && key==KeyEvent.KEYCODE_DPAD_DOWN) {
-                    View widget=index==0&&shelf!=null?shelf.first():index==0&&board!=null?board.first():null;
+                    View widget=index==0&&board!=null?board.first():null;
                     if (!page.equals(pages[index])) showPage(pages[index], true); else if(widget!=null)widget.requestFocus();else focusFirst();
                     return true;
                 }
@@ -288,12 +308,6 @@ public final class MainActivity extends Activity {
                     } catch (RuntimeException ignored) { /* A package can disappear during an update. */ }
                 }
             }
-            if (seen.contains(Shelf.YOUTUBE)) {
-                App windah=new App(); windah.pkg=WINDAH; windah.label="Windah Live"; windah.color=0xFFFF4B4B; windah.tag="LIVE";
-                windah.description="Windah Basudara, live and recent streams.";
-                windah.banner=BitmapFactory.decodeResource(getResources(),R.drawable.windah_banner); windah.icon=windah.banner;
-                found.add(windah);
-            }
             Collections.sort(found, (a,b)->a.label.compareToIgnoreCase(b.label));
             runOnUiThread(() -> {
                 if (isDestroyed()) return;
@@ -324,8 +338,10 @@ public final class MainActivity extends Activity {
         for (App app:apps) if (!ids.contains(app.pkg)) ids.add(app.pkg);
         return ids;
     }
-    /** Apps hidden from Home; by default the CleanYourTV launcher, kept installed for its remote-key helper. */
-    private Set<String> hiddenApps(){return prefs.getStringSet("hidden",Collections.singleton("com.gathin.tvhome"));}
+    /** Apps hidden from Home (they stay in Apps). By default the Play Store, and the CleanYourTV launcher, kept
+     *  installed for its remote-key helper. */
+    private static final Set<String> DEFAULT_HIDDEN=new HashSet<>(Arrays.asList("com.gathin.tvhome","com.android.vending"));
+    private Set<String> hiddenApps(){return prefs.getStringSet("hidden",DEFAULT_HIDDEN);}
     private ArrayList<App> visibleApps(boolean all) {
         ArrayList<App> result=new ArrayList<>();
         Set<String> hidden=hiddenApps();
@@ -338,13 +354,13 @@ public final class MainActivity extends Activity {
         boolean transition=loaded && !previous.equals(next) && motion();
         for(Animator animation:pageAnimations)animation.cancel();pageAnimations.clear();
         for(Tile tile:tiles) tile.movement.stop();
-        content.animate().cancel();content.setAlpha(1);content.setTranslationX(0);
+        content.animate().cancel();content.setAlpha(1);content.setTranslationX(0);content.setTranslationY(0);scrolledDown=false;tabBar.animate().cancel();tabBar.setAlpha(1);
         if(houseWidgets!=null&&houseWidgets.current!=null)lastHome=houseWidgets.current;
         if(board!=null)homePage=board.index;
         content.removeAllViews();houseWidgets=null;board=null;shelf=null;content.setTag(null);
         page=next;homeGreeting=page.equals("home");heroPackage=homeGreeting?"@greeting":"";tiles.clear();
         light=pale(variant(wallpaperStyle()));paintChrome();
-        clock.setVisibility(prefs.getBoolean("clock", true) ? View.VISIBLE : View.GONE);
+        clock.setVisibility(prefs.getBoolean("clock", true) && !page.equals("home") ? View.VISIBLE : View.GONE); // Home has its own clock card
         moveTabIndicator(transition);
         wallpaper.update();wallpaper.rest();wallpaper.syncAmbient();
         sceneryShade.animate().cancel();
@@ -358,11 +374,13 @@ public final class MainActivity extends Activity {
         heroDescription=text(home ? greetingLine() : "Everything installed on this TV.", 16, ink(0xB3), "sans-serif");
         heroDescription.setSingleLine(true); heroDescription.setEllipsize(android.text.TextUtils.TruncateAt.END); shadow(heroDescription,8); hero.addView(heroDescription,pos(home?392:860,22,1,60));
         // Without widgets, the greeting moves down to sit just above the favourites and the wallpaper stays open above it.
-        ArrayList<ArrayList<String>> layout=new ArrayList<>(); // no widgets: Home is the top shelf and the apps, as on tvOS
+        // Home's top row is fixed: a clock card and the weather, as one page.
+        ArrayList<ArrayList<String>> layout=new ArrayList<>();
+        if(home)layout.add(new ArrayList<>(Arrays.asList("clock","weather")));
         boolean housePage=false;for(ArrayList<String> p:layout)housePage|=p.contains("house");
         content.addView(hero,pos(864,88,48,home?(!layout.isEmpty()?96:272):100));
         heroKey=home?"@greeting":"";
-        if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost);content.addView(shelf,pos(960,270,0,92));}
+        if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost);content.addView(shelf,pos(960,240,0,SHELF_Y));}
         if(home&&housePage){
             houseWidgets=new HouseWidgets(this,unit,new HouseWidgets.Callbacks(){
                 public void up(){tabs.get(0).requestFocus();}
@@ -389,53 +407,34 @@ public final class MainActivity extends Activity {
         rows=new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL); rows.setClipChildren(false); rows.setClipToPadding(false);
         rows.setPadding(px(48),px(home?16:10),px(48),px(30));
         scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
-        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 388 : 200));
+        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 350 : 200));
         ArrayList<App> list=visibleApps(!home);
         if (!loaded) {
             rows.addView(text("Finding your apps…",15,ink(0xBB),"sans-serif"));
         } else if (list.isEmpty()) {
             rows.addView(text("Your home is empty. Find your apps in the Apps tab.",15,ink(0xBB),"sans-serif"));
         } else {
-            int count=home ? Math.min(6,list.size()) : list.size();
-            for (int start=0;start<count;start+=6) {
+            int count=home ? Math.min(COLS,list.size()) : list.size();
+            for (int start=0;start<count;start+=COLS) {
                 LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setClipChildren(false); row.setClipToPadding(false); row.setGravity(Gravity.TOP);
-                for (int i=start;i<Math.min(start+6,count);i++) {
+                for (int i=start;i<Math.min(start+COLS,count);i++) {
                     App app=list.get(i); Tile tile=new Tile(app,i);
-                    LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(px(132),px(108));
-                    if (i>start) tp.leftMargin=px(14.4f);
+                    LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(px(TILE_W),px(TILE_H+34));
+                    if (i>start) tp.leftMargin=px((864-COLS*TILE_W)/(COLS-1f));
                     row.addView(tile,tp); tiles.add(tile);
                 }
-                rows.addView(row,new LinearLayout.LayoutParams(-1,px(112)));
+                rows.addView(row,new LinearLayout.LayoutParams(-1,px(TILE_H+38)));
             }
         }
         if (focus) root.post(()->{holdGreeting=page.equals("home");focusFirst();});
         animatePage(previous,transition);
     }
 
+    /** tvOS switches tabs with a short crossfade: the new page fades in as one layer. */
     private void animatePage(String previous,boolean transition) {
         if(!transition)return;
-        int before=previous.equals("home")?0:previous.equals("apps")?1:2;
-        int after=page.equals("home")?0:page.equals("apps")?1:2;
-        float direction=after>=before?1:-1;
-        // Animate real element bounds rather than blending two full-screen textures.
-        // This preserves the soft page entrance within a small TV chip's fill-rate budget.
-        ArrayList<View> entering=new ArrayList<>();
-        for(int i=0;i<content.getChildCount();i++)if(!(content.getChildAt(i) instanceof ScrollView)&&!"scroll-frame".equals(content.getChildAt(i).getTag()))entering.add(content.getChildAt(i));
-        if(page.equals("settings")) {
-            Object tag=content.getTag();if(tag instanceof ArrayList)for(Object row:(ArrayList<?>)tag)if(row instanceof View)entering.add((View)row);
-        } else {
-            for(int i=0;i<rows.getChildCount();i++)if(rows.getChildAt(i) instanceof TextView)entering.add(rows.getChildAt(i));
-            entering.addAll(tiles);
-        }
-        for(int i=0;i<entering.size();i++) {
-            View view=entering.get(i);float offset=px(16)*direction;
-            view.setAlpha(0);view.setTranslationX(offset);
-            ObjectAnimator fade=ObjectAnimator.ofFloat(view,View.ALPHA,0,1);fade.setDuration(270);
-            ObjectAnimator slide=ObjectAnimator.ofFloat(view,View.TRANSLATION_X,offset,0);slide.setDuration(340);
-            AnimatorSet set=new AnimatorSet();set.playTogether(fade,slide);set.setInterpolator(ease);set.setStartDelay(Math.min(i,5)*10);
-            pageAnimations.add(set);set.start();
-        }
+        content.setAlpha(0);content.animate().alpha(1).setDuration(220).setInterpolator(decelerate).withLayer().start();
     }
 
     private void focusFirst() {
@@ -562,7 +561,6 @@ public final class MainActivity extends Activity {
     }
 
     private void launch(App app) {
-        if (app.pkg.equals(WINDAH)) { sound(); Shelf.open(this,Shelf.CHANNEL+"/live"); remember(app.pkg); return; }
         try {
             Intent intent=getPackageManager().getLeanbackLaunchIntentForPackage(app.pkg);
             if (intent==null) intent=getPackageManager().getLaunchIntentForPackage(app.pkg);
@@ -796,7 +794,7 @@ public final class MainActivity extends Activity {
             if (index==2 && current>0) Collections.swap(ids,current,current-1);
             if (index==3 && current<ids.size()-1) Collections.swap(ids,current,current+1);
             if (index==4) { if (hidden.contains(app.pkg)) hidden.remove(app.pkg); else hidden.add(app.pkg); }
-            if (index==5) { if (app.pkg.equals(WINDAH)) return; startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+app.pkg))); return; }
+            if (index==5) { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+app.pkg))); return; }
             prefs.edit().putString("order",String.join(",",ids)).putStringSet("hidden",hidden).apply();
             selectedPackage=app.pkg;showPage(page,true);
         });
@@ -832,18 +830,13 @@ public final class MainActivity extends Activity {
         ArrayList<View> controls=new ArrayList<>();
         caption(list,"Appearance",true);
         controls.add(option(list,"Wallpaper",()->WALLPAPERS[wallpaperStyle()],null,this::wallpaperPicker,
-            ()->preview(THUMBS[wallpaperStyle()],WALLPAPERS[wallpaperStyle()],"Eight wallpapers, from silver silk to the Milky Way. Silver is light by day and dark after sunset.")));
-        controls.add(option(list,"Your name",()->{String n=prefs.getString("name","").trim();return n.isEmpty()?"Add":n;},null,this::nameEditor,
-            ()->preview(0,"Your name","Home greets you by name. It is saved only on this TV.")));
+            ()->preview(THUMBS[wallpaperStyle()],WALLPAPERS[wallpaperStyle()],"Eight wallpapers, from silver silk to the Milky Way. Silver stays light, day and night.")));
         controls.add(option(list,"Clock",null,"clock",()->{},()->preview(0,"Clock","Shows the time in the top-right corner of every page.")));
         caption(list,"Motion and sound",false);
         controls.add(option(list,"Fluid motion",null,"motion",()->{},()->preview(0,"Fluid motion","Springy focus, depth and the 3D flight into your TV. Turn off for a calmer, simpler screen.")));
-        controls.add(option(list,"Living wallpaper",null,"ambient",()->wallpaper.syncAmbient(),()->preview(THUMBS[wallpaperStyle()],"Living wallpaper","Clouds drift and water moves very slowly. Pauses whenever an app is open.")));
         controls.add(option(list,"Navigation sounds",null,"sound",()->{},()->preview(0,"Navigation sounds","Soft, quiet feedback as you move and open apps.")));
         caption(list,"Home",false);
         widgetsRow=controls.size();
-        controls.add(option(list,"Home widgets",this::widgetSummary,null,this::widgetEditor,
-            ()->preview(0,"Home widgets","Choose what Home shows above your apps — "+(house?"Smart Home, ":"")+"Up Next, Weather, "+(InputsWidget.count>0?"Inputs, ":"")+"Now Playing and Control — and their order. Left and Right turn the pages.")));
         controls.add(option(list,"Temperature",()->new String[]{"Automatic","Celsius","Fahrenheit"}[unitIndex()],null,this::temperatureMenu,
             ()->preview(0,"Temperature","Weather in Celsius or Fahrenheit. Automatic follows the TV's region. The forecast is for "+Daylight.city()+", the main city of the TV's time zone.")));
         if(house)controls.add(option(list,"Scene apps",()->"Choose",null,this::sceneApps,()->preview(0,"Scene apps","Open an app after a scene — Movie can start Netflix as the lights go down.")));
@@ -854,7 +847,7 @@ public final class MainActivity extends Activity {
         controls.add(option(list,"Support the author",()->"",null,this::supportScreen,()->preview(0,"Support the author","Luma is free and has no ads. A tip in crypto helps it grow.")));
         controls.add(option(list,"About Luma",()->"",null,this::aboutScreen,()->preview(0,"About Luma","Version "+version()+" · made by "+about("author"))));
         content.setTag(controls);
-        preview(THUMBS[wp],WALLPAPERS[wp],"Eight wallpapers, from silver silk to the Milky Way. Silver is light by day and dark after sunset.");
+        preview(THUMBS[wp],WALLPAPERS[wp],"Eight wallpapers, from silver silk to the Milky Way. Silver stays light, day and night.");
         if (focus) root.post(()->controls.get(0).requestFocus());
     }
     private void caption(LinearLayout list,String label,boolean first){
@@ -1045,45 +1038,46 @@ public final class MainActivity extends Activity {
             super(MainActivity.this);app=item;index=number;
             setClipChildren(false);setClipToPadding(false);setFocusable(true);setFocusableInTouchMode(true);setSoundEffectsEnabled(false);
             setContentDescription(app.label+". OK: open. Hold OK: organize app.");
-            face=new FrameLayout(MainActivity.this);GradientDrawable faceBg=shape(app.color,16);faceBg.setStroke(Math.max(1,px(.6f)),0x1FFFFFFF);face.setBackground(faceBg);face.setClipToOutline(true);face.setElevation(px(2));face.setCameraDistance(px(900));
+            face=new FrameLayout(MainActivity.this);GradientDrawable faceBg=shape(app.color,RADIUS);faceBg.setStroke(Math.max(1,px(.6f)),0x1FFFFFFF);face.setBackground(faceBg);face.setClipToOutline(true);face.setElevation(px(2));face.setCameraDistance(px(900));
             art=new Art(app);face.addView(art,new FrameLayout.LayoutParams(-1,-1));
             light=new Shine();light.setAlpha(0);face.addView(light,new FrameLayout.LayoutParams(-1,-1));
-            rim=shape(Color.TRANSPARENT,16);rim.setStroke(px(1.2f),0xF0FFFFFF);rim.setAlpha(0);face.setForeground(rim);
-            addView(face,pos(132,76,0,0));
+            rim=shape(Color.TRANSPARENT,RADIUS);rim.setStroke(px(1.2f),0xF0FFFFFF);rim.setAlpha(0);face.setForeground(rim);
+            addView(face,pos(TILE_W,TILE_H,0,0));
             label=text(app.label,13.5f,ink(0xFF),"sans-serif-medium");label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);label.setAlpha(0);shadow(label,6);
-            addView(label,pos(160,22,-14,88));
+            addView(label,pos(TILE_W+28,22,-14,TILE_H+12));
             movement=new TileMotion(this);
             setOnFocusChangeListener((v,f)-> {
                 movement.focus(f);
-                face.setElevation(px(f?14:2));rim.setAlpha(f?210:0);
+                
                 label.animate().cancel();if(motion())label.animate().alpha(f?1:0).translationY(f?0:-px(3)).setDuration(f?260:140).setInterpolator(ease).start();else label.setAlpha(f?1:0);
                 setTranslationZ(px(f?20:0));
                 if(f) {
                     selectApp(app);wallpaper.follow(index);
-                    if(index<6) scroll.post(()->scroll.smoothScrollTo(0,0));
+                    if(index<COLS) scroll.post(()->scroll.smoothScrollTo(0,0));
                     else requestRectangleOnScreen(new Rect(-px(12),-px(14),getWidth()+px(12),getHeight()+px(5)),false);
                 }
             });
-            setOnClickListener(v->launch(app));
+            setOnClickListener(v->{if(motion())postDelayed(()->launch(app),120);else launch(app);});
             setOnLongClickListener(v->{sound();appMenu(app);return true;});
             setOnKeyListener((v,key,e)-> {
                 if(key==KeyEvent.KEYCODE_DPAD_CENTER || key==KeyEvent.KEYCODE_ENTER) {
                     movement.press(e.getAction()==KeyEvent.ACTION_DOWN);return false;
                 }
                 if(e.getAction()!=KeyEvent.ACTION_DOWN) return false;
-                if(key==KeyEvent.KEYCODE_DPAD_UP && index<6 && page.equals("home") && shelf!=null && shelf.focusCurrent()) return true;
-                if(key==KeyEvent.KEYCODE_DPAD_UP && index<6){
+                if(key==KeyEvent.KEYCODE_DPAD_UP && page.equals("home")){tabs.get(0).requestFocus();return true;} // up from the apps: the tabs, as on tvOS
+                if(key==KeyEvent.KEYCODE_DPAD_DOWN && page.equals("home") && shelf!=null){if(shelf.focusCurrent())scrollHome(true);return true;}
+                if(key==KeyEvent.KEYCODE_DPAD_UP && index<COLS){
                     int[] l=new int[2];getLocationOnScreen(l);float x=l[0]+getWidth()/2f;
                     View above=!page.equals("home")||board==null?null:board.onHouse()?null:board.nearest(x);
                     if(page.equals("home")&&board!=null&&board.onHouse()&&houseWidgets!=null)houseWidgets.focusNearest(x);
                     else if(above!=null)above.requestFocus();else tabs.get(pageTab()).requestFocus();
                     return true;}
                 int next=-1;
-                if(key==KeyEvent.KEYCODE_DPAD_LEFT && index%6>0) next=index-1;
-                if(key==KeyEvent.KEYCODE_DPAD_RIGHT && index%6<5 && index+1<tiles.size()) next=index+1;
-                if(key==KeyEvent.KEYCODE_DPAD_DOWN && index+6<tiles.size()) next=index+6;
-                if(key==KeyEvent.KEYCODE_DPAD_UP && index>=6) next=index-6;
-                if(next>=0){if(e.getRepeatCount()==0 || e.getRepeatCount()%2==0){homeGreeting=false;lastDirectionX=Integer.compare(next%6,index%6);lastDirectionY=Integer.compare(next/6,index/6);navigationSound(next);tiles.get(next).requestFocus();}return true;}
+                if(key==KeyEvent.KEYCODE_DPAD_LEFT && index%COLS>0) next=index-1;
+                if(key==KeyEvent.KEYCODE_DPAD_RIGHT && index%COLS<COLS-1 && index+1<tiles.size()) next=index+1;
+                if(key==KeyEvent.KEYCODE_DPAD_DOWN && index+COLS<tiles.size()) next=index+COLS;
+                if(key==KeyEvent.KEYCODE_DPAD_UP && index>=COLS) next=index-COLS;
+                if(next>=0){if(e.getRepeatCount()==0 || e.getRepeatCount()%2==0){homeGreeting=false;lastDirectionX=Integer.compare(next%COLS,index%COLS);lastDirectionY=Integer.compare(next/COLS,index/COLS);navigationSound(next);tiles.get(next).requestFocus();}return true;}
                 return key==KeyEvent.KEYCODE_DPAD_LEFT || key==KeyEvent.KEYCODE_DPAD_RIGHT || key==KeyEvent.KEYCODE_DPAD_DOWN;
             });
         }
@@ -1091,42 +1085,44 @@ public final class MainActivity extends Activity {
     }
 
     /** Native property animations keep the static card artwork cached on the GPU. */
+    /** tvOS focus: the icon lifts with an almost critically damped spring and a deeper shadow, tilts once toward the
+     *  move and settles flat, and a soft gloss sweeps across it in the same direction. Neighbours stay flat. Each
+     *  move is a few ViewPropertyAnimators on a hardware layer: nothing is allocated per frame. */
     private final class TileMotion {
         final Tile tile;
         boolean focused,pressed;
         TileMotion(Tile tile){this.tile=tile;}
         void focus(boolean value) {
             focused=value;pressed=false;
-            if(value && motion()) {
-                tile.face.animate().cancel();
-                tile.face.setRotationY(-lastDirectionX*4.5f);tile.face.setRotationX(lastDirectionY*3f);
-            }
-            start();
-            if(motion()) {
-                tile.art.animate().cancel();
-                float depthX=focused?px((tile.index%6-2.5f)*.7f):0;
-                float depthY=focused?-px(1):0;
-                if(focused){tile.art.setTranslationX(depthX-px(lastDirectionX*4.5f));tile.art.setTranslationY(depthY+px(lastDirectionY*3));tile.light.setTranslationX(px(lastDirectionX*12));}
-                tile.art.animate().translationX(depthX).translationY(depthY).setDuration(520).setInterpolator(drift).start();
-                tile.light.animate().translationX(focused?-depthX*2:0).alpha(focused?.6f:0).setDuration(580).setInterpolator(drift).start();
-            }
-        }
-        void press(boolean down){pressed=down;start();}
-        void start(){
             if(!motion()){snap();return;}
-            tile.face.animate().cancel();tile.label.animate().cancel();tile.light.animate().cancel();
-            float scale=(focused?1.11f:1)-(pressed?.03f:0);
-            tile.face.animate().scaleX(scale).scaleY(scale).translationY(focused?-px(3):0).rotationX(0).rotationY(0).setDuration(pressed?65:420).setInterpolator(pressed?ease:spring).withLayer().start();
-            tile.label.animate().scaleX(focused?1.025f:1).scaleY(focused?1.025f:1).setDuration(260).setInterpolator(ease).start();
-            tile.light.animate().alpha(focused?.6f:0).setDuration(200).setInterpolator(ease).start();
+            tile.face.animate().cancel();tile.light.animate().cancel();
+            if(value) {
+                tile.face.setRotationY(-lastDirectionX*5f);tile.face.setRotationX(lastDirectionY*4f);
+                float w=tile.face.getWidth(),dir=lastDirectionX!=0?lastDirectionX:1;
+                tile.light.setTranslationX(-dir*w*.75f);tile.light.setAlpha(.95f);
+                tile.light.animate().translationX(dir*w*.1f).alpha(.4f).setDuration(560).setInterpolator(decelerate).start();
+            } else tile.light.animate().alpha(0).setDuration(160).setInterpolator(decelerate).start();
+            lift(value?280:200,value?settle:decelerate);
         }
+        /** OK: the icon gives a little under the press, then the app opens (see the click listener). */
+        void press(boolean down){
+            if(pressed==down)return;pressed=down;
+            if(!motion()){snap();return;}
+            tile.face.animate().cancel();lift(down?90:220,decelerate);
+        }
+        private void lift(long duration,android.view.animation.Interpolator curve){
+            float scale=focused?(pressed?LIFT*.94f:LIFT):1f;
+            tile.face.animate().scaleX(scale).scaleY(scale).translationY(focused?-px(4):0).translationZ(focused&&!pressed?px(18):0)
+                .rotationX(0).rotationY(0).setDuration(duration).setInterpolator(curve).withLayer().start();
+        }
+        void start(){lift(220,decelerate);}
         void stop(){tile.face.animate().cancel();tile.art.animate().cancel();tile.label.animate().cancel();tile.light.animate().cancel();}
         void snap(){
             stop();pressed=false;
-            float scale=focused?1.11f:1;
-            tile.face.setScaleX(scale);tile.face.setScaleY(scale);tile.face.setTranslationY(focused?-px(3):0);tile.face.setRotationX(0);tile.face.setRotationY(0);
-            tile.art.setTranslationX(0);tile.art.setTranslationY(0);tile.light.setTranslationX(0);tile.light.setAlpha(focused?.6f:0);
-            tile.label.setScaleX(focused?1.025f:1);tile.label.setScaleY(focused?1.025f:1);
+            float scale=focused?LIFT:1;
+            tile.face.setScaleX(scale);tile.face.setScaleY(scale);tile.face.setTranslationY(focused?-px(4):0);tile.face.setTranslationZ(focused?px(18):0);
+            tile.face.setRotationX(0);tile.face.setRotationY(0);
+            tile.art.setTranslationX(0);tile.art.setTranslationY(0);tile.light.setTranslationX(0);tile.light.setAlpha(focused?.4f:0);
         }
     }
 
@@ -1140,7 +1136,7 @@ public final class MainActivity extends Activity {
         @Override protected void onDraw(Canvas c) {
             float w=getWidth(),h=getHeight();
             bounds.set(0,0,w,h);
-            p.setColor(app.color);p.setShader(null);c.drawRoundRect(bounds,px(16),px(16),p);
+            p.setColor(app.color);p.setShader(null);c.drawRoundRect(bounds,px(RADIUS),px(RADIUS),p);
             String pkg=app.pkg;
             if(app.banner!=null) {
                 // The app's own banner fills the card at its own aspect (cropped a little rather than letterboxed).
@@ -1178,7 +1174,7 @@ public final class MainActivity extends Activity {
                 drawIcon(c,app.icon,47);
             } else drawIcon(c,app.icon,48);
             p.setShader(finish);
-            bounds.set(0,0,w,h);c.drawRoundRect(bounds,px(16),px(16),p);p.setShader(null);
+            bounds.set(0,0,w,h);c.drawRoundRect(bounds,px(RADIUS),px(RADIUS),p);p.setShader(null);
         }
         private void drawIcon(Canvas c,Bitmap icon,float size) {float s=px(size);bounds.set((getWidth()-s)/2,(getHeight()-s)/2,(getWidth()+s)/2,(getHeight()+s)/2);p.setAlpha(255);c.drawBitmap(icon,null,bounds,p);}
     }
@@ -1232,29 +1228,22 @@ public final class MainActivity extends Activity {
             front.leftMargin=-margin;front.topMargin=-margin;addView(terrain,front);
             update();
         }
-        void follow(int index) {
-            skyTrack.animate().cancel();terrain.animate().cancel();
-            float position=(index%6-2.5f)/2.5f;
-            float arc=1-position*position;
-            if(motion()) {
-                skyTrack.animate().translationX(-position*px(requestedStyle>=3?11:5)).translationY(px(arc*(requestedStyle>=3?2.2f:.7f))).setDuration(1000).setInterpolator(drift).start();
-                terrain.animate().translationX(-position*px(22)).translationY(px(arc*3-Math.min(index/6,2)*2)).setDuration(680).setInterpolator(drift).start();
-            } else rest();
-        }
+        /** A still wallpaper: nothing moves behind the apps (no parallax). */
+        void follow(int index) {}
         void rest(){
             skyTrack.animate().cancel();terrain.animate().cancel();
             skyTrack.setTranslationX(0);skyTrack.setTranslationY(0);terrain.setTranslationX(0);terrain.setTranslationY(0);
         }
         private boolean ambientEligible() {
             return started && hasWindowFocus() && !page.equals("settings") && requestedStyle!=2
-                && motion() && prefs.getBoolean("ambient",true) && sky.scene!=null && terrain.scene!=null;
+                && motion() && prefs.getBoolean("ambient",false) && sky.scene!=null && terrain.scene!=null;
         }
         void syncAmbient() {
             if(ambientEligible()) {
                 if(!ambientRunning){ambientRunning=true;lastAmbientTick=SystemClock.uptimeMillis();handler.postDelayed(ambientTick,100);}
             } else {
                 pauseAmbient();
-                if(!motion() || !prefs.getBoolean("ambient",true) || requestedStyle==2) {
+                if(!motion() || !prefs.getBoolean("ambient",false) || requestedStyle==2) {
                     cloudX=0;cloudY=0;sky.drawSurface();terrain.drawSurface();
                 }
             }
