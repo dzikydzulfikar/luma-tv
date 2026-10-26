@@ -52,8 +52,10 @@ public final class PrayerTest {
         StringBuilder today=new StringBuilder();int[] t=Prayer.times(2026,10,26,Prayer.LAT,Prayer.LON);
         for(int i=0;i<5;i++)today.append(Prayer.NAMES[i]).append(' ').append(Prayer.hm(t[i])).append(i<4?", ":"");
         if(!today.toString().equals("Subuh 04:18, Dzuhur 11:38, Ashar 14:51, Maghrib 17:47, Isya 18:58"))throw new AssertionError(today);
-        // 20:00 WIB on 26 Oct 2026 is after Isya: next is Subuh on the 27th.
-        if(!"0 04:18".equals(Prayer.next(1793019600000L)[0]+" "+Prayer.next(1793019600000L)[1]))throw new AssertionError("next "+Prayer.next(1793019600000L)[1]);
+        // 20:00 WIB on 26 Oct 2026 is after Isya: tomorrow's Subuh and Dzuhur; 18:00 is between Maghrib and Isya.
+        String night=Prayer.upcoming(1793019600000L),evening=Prayer.upcoming(1793019600000L-2*3600000L);
+        if(!night.equals("Subuh 04:18 · Dzuhur 11:38"))throw new AssertionError(night);
+        if(!evening.equals("Isya 18:58 · Subuh 04:18"))throw new AssertionError(evening);
         System.out.println("ok: "+exact+" of "+n+" times exact; 26 Oct 2026 Setiabudi: "+today);
     }
 }

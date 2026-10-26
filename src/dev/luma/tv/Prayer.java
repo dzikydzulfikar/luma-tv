@@ -46,14 +46,17 @@ final class Prayer {
         double eqt=q/15-((ra%24+24)%24);eqt=((eqt+12)%24+24)%24-12;
         return new double[]{Math.asin(Math.sin(e)*Math.sin(l)),eqt};
     }
-    /** The next prayer from a moment: its index into NAMES and its time as "HH:mm". After Isya it is tomorrow's Subuh. */
-    static Object[] next(long now){
+    /** The next two prayers from a moment, as "Isya 18:58 · Subuh 04:18"; after Isya they are tomorrow's. */
+    static String upcoming(long now){
         Calendar c=Calendar.getInstance(ZONE);c.setTimeInMillis(now);
         int minute=c.get(Calendar.HOUR_OF_DAY)*60+c.get(Calendar.MINUTE);
-        int[] t=times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON);
-        for(int i=0;i<5;i++)if(t[i]>minute)return new Object[]{i,hm(t[i])};
-        c.add(Calendar.DAY_OF_MONTH,1);
-        return new Object[]{0,hm(times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON)[0])};
+        StringBuilder out=new StringBuilder();int found=0;
+        for(int day=0;day<2&&found<2;day++){
+            int[] t=times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON);
+            for(int i=0;i<5&&found<2;i++)if(day>0||t[i]>minute){out.append(found++>0?" · ":"").append(NAMES[i]).append(' ').append(hm(t[i]));}
+            c.add(Calendar.DAY_OF_MONTH,1);
+        }
+        return out.toString();
     }
     static String hm(int m){return String.format(Locale.ROOT,"%02d:%02d",m/60,m%60);}
 }
