@@ -98,7 +98,7 @@ public final class MainActivity extends Activity {
     private final Runnable clockTick = new Runnable() {
         public void run() {
             if (!started) return;
-            if (clock != null) clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+            if (clock != null) clock.setText(new SimpleDateFormat("HH:mm", Locale.ENGLISH).format(new Date()));
             handler.postDelayed(this, 15000);
         }
     };

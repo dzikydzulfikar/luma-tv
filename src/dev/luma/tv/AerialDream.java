@@ -21,7 +21,7 @@ public final class AerialDream extends DreamService implements SurfaceHolder.Cal
     private MediaPlayer player;
     private List<Aerials.Film> films=Collections.emptyList();
     private int index;
-    private final Runnable tick=new Runnable(){public void run(){clock.setText(new SimpleDateFormat("HH:mm",Locale.getDefault()).format(new Date()));long now=System.currentTimeMillis();handler.postDelayed(this,60000-now%60000+50);}};
+    private final Runnable tick=new Runnable(){public void run(){clock.setText(new SimpleDateFormat("HH:mm",Locale.ENGLISH).format(new Date()));long now=System.currentTimeMillis();handler.postDelayed(this,60000-now%60000+50);}};
     private final Runnable next=()->{veil.animate().alpha(1).setDuration(FADE_MS).withEndAction(()->{index++;play();}).start();};
 
     @Override public void onAttachedToWindow(){

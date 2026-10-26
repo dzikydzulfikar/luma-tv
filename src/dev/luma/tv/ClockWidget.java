@@ -63,7 +63,7 @@ final class ClockWidget extends Widget {
                 if(icons[i]!=null){Glyph g=new Glyph(context).kind(icons[i]).color(ink(0x99));addView(g,pos(20,20,x+colW/2-10,56));}
                 else{View dot=new View(context);dot.setBackground(oval(ink(0xFF)));addView(dot,pos(7,7,x+colW/2-3.5f,62.5f));}
                 TextView t=text("",17,ink(i==2?0xFF:0xB3),i==2?"sans-serif-medium":"sans-serif-light");t.setGravity(Gravity.CENTER_HORIZONTAL);addView(t,pos(colW,22,x,88));
-                TextView n=text(i==0?"Terbit":i==1?"Terbenam":"",11.5f,ink(0x80),"sans-serif");n.setGravity(Gravity.CENTER_HORIZONTAL);addView(n,pos(colW,15,x,114));
+                TextView n=text(i==0?"Sunrise":i==1?"Sunset":"",11.5f,ink(0x80),"sans-serif");n.setGravity(Gravity.CENTER_HORIZONTAL);addView(n,pos(colW,15,x,114));
                 times.add(t);names.add(n);
             }
         }
@@ -75,8 +75,8 @@ final class ClockWidget extends Widget {
     @Override void refresh(){paint();}
     private void paint(){
         Date now=new Date();
-        time.setText(new SimpleDateFormat("HH:mm",Locale.getDefault()).format(now)); // 24-hour, like the clock on the other pages
-        date.setText(new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(now));
+        time.setText(new SimpleDateFormat("HH:mm",Locale.ENGLISH).format(now)); // 24-hour, like the clock on the other pages
+        date.setText(new SimpleDateFormat("EEEE, d MMMM",Locale.ENGLISH).format(now));
         if(style.equals("D"))return;
         int[] s=Prayer.schedule(now.getTime());int next=s[7];
         if(style.equals("A"))for(int i=0;i<5;i++){
