@@ -31,6 +31,8 @@
 > The clock card also shows today's prayers for Jakarta (Muhammadiyah's criteria, computed offline) in one of four
 > looks (default `B`), switched with `adb shell am start -n dev.luma.tv/.MainActivity --es luma.clock A` (`A` list, `B` next
 > prayer large, `C` sunrise, sunset and next prayer, `D` no prayers, narrow centred clock).
+> The pale backdrop is generated on the TV: `--es luma.bg mesh` (default: warm white into light blue and lilac),
+> `aerial` (a blurred, brightened frame of a downloaded Apple TV aerial), `pearl` (near-white) or `silk` (the old photo, blurred).
 
 ## What it does
 

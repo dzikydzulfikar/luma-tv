@@ -174,6 +174,8 @@ public final class MainActivity extends Activity {
         String demo=intent.getStringExtra("luma.demo");if(demo!=null){Promo.on=demo.equals("promo");if(Promo.on)Promo.start();board=null;homePage=0;showPage("home",true);} // board=null: start on the first page
         String clockStyle=intent.getStringExtra("luma.clock"); // a hidden switch between the clock card's looks (ClockWidget)
         if(clockStyle!=null&&clockStyle.matches("[ABCD]")){ClockWidget.style=clockStyle;prefs.edit().putString("clock_style",clockStyle).apply();board=null;homePage=0;showPage("home",true);}
+        String bg=intent.getStringExtra("luma.bg"); // a hidden switch between the pale backdrops (Backdrops)
+        if(bg!=null&&Arrays.asList(Backdrops.NAMES).contains(bg)){prefs.edit().putString("bg",bg).apply();wallpaper.update();}
         String inputs=intent.getStringExtra("luma.inputs");if(inputs!=null){InputsWidget.demo=inputs.equals("demo");showPage(page,true);} // arrives while paused
         if (intent.hasCategory(Intent.CATEGORY_HOME)){selectedPackage="com.google.android.youtube.tv";if(started)homePage=0;showPage("home", true);} // Home pressed on Home: back to the first page
     }
@@ -335,6 +337,7 @@ public final class MainActivity extends Activity {
                         app.tag=tagFor(pkg);
                         Drawable banner=info.activityInfo.applicationInfo.loadBanner(pm);
                         if (banner!=null) app.banner=hd(banner);
+                        if (pkg.equals("com.android.tv.settings")) app.banner=SettingsTile.draw(640,384); // our own gear, not the system's
                         found.add(app);
                     } catch (RuntimeException ignored) { /* A package can disappear during an update. */ }
                 }
@@ -1303,7 +1306,7 @@ public final class MainActivity extends Activity {
             cloudX=px(14)*(float)Math.sin(ambientSeconds*Math.PI*2/112);
             cloudY=px(.65f)*(float)Math.sin(ambientSeconds*Math.PI*2/83);
             if(blend>=1){sky.drawSurface();terrain.drawSurface();ambientTicks++;}
-            handler.postDelayed(this,100);
+            handler.postDelayed(this,drifts()?400:100);
         }};
         Bitmap skySource, terrainSource;
         int requestedStyle=-1;
@@ -1333,7 +1336,11 @@ public final class MainActivity extends Activity {
         }
         private boolean ambientEligible() {
             return started && hasWindowFocus() && !page.equals("settings") && requestedStyle!=2
-                && motion() && prefs.getBoolean("ambient",false) && sky.scene!=null && terrain.scene!=null;
+                && motion() && (prefs.getBoolean("ambient",false)||drifts()) && sky.scene!=null && terrain.scene!=null;
+        }
+        /** The mesh backdrop can drift a few pixels over minutes (a redraw every 400 ms). Off unless the "bg_drift"
+         *  pref is set: on this box the redraws cost about a point of janky frames, and the drift is too slow to see. */
+        private boolean drifts(){return prefs.getBoolean("bg_drift",false)&&requestedStyle==SILVER&&requestedBg.equals("mesh");
         }
         void syncAmbient() {
             if(ambientEligible()) {
@@ -1372,22 +1379,15 @@ public final class MainActivity extends Activity {
             }
             return result;
         }
-        /** A wide blur made once, off the UI thread: shrink in steps, then grow back with filtering. A still bitmap costs
-         *  nothing per frame, unlike a live blur behind the cards. */
-        private Bitmap soften(Bitmap photo){
-            int w=photo.getWidth(),h=photo.getHeight();Bitmap b=photo;
-            for(int k:new int[]{4,16,48}){Bitmap n=Bitmap.createScaledBitmap(b,Math.max(1,w/k),Math.max(1,h/k),true);if(b!=photo)b.recycle();b=n;}
-            for(int k:new int[]{16,4}){Bitmap n=Bitmap.createScaledBitmap(b,w/k,h/k,true);b.recycle();b=n;}
-            photo.recycle();return b;
-        }
         void update(){show(wallpaperStyle());}
         /** Fill under the picture: pale silver, graphite, or the night blue of the original scenes. */
         int base(int style){return pale(style)?0xFFE4E5E8:style>=SILVER?0xFF0B0B0D:0xFF080C14;}
         /** Shows a wallpaper without saving it (the picker previews live). Silver resolves to its day or night picture. */
+        String requestedBg="";
         void show(final int choice) {
-            final int style=variant(choice);
-            if(requestedStyle==style)return;
-            requestedStyle=style;
+            final int style=variant(choice);final String bg=prefs.getString("bg","mesh");
+            if(requestedStyle==style&&requestedBg.equals(bg))return;
+            requestedStyle=style;requestedBg=bg;
             final int width=getResources().getDisplayMetrics().widthPixels;
             final int height=getResources().getDisplayMetrics().heightPixels;
             loader.execute(()-> {
@@ -1395,8 +1395,10 @@ public final class MainActivity extends Activity {
                 if(style>=3) {
                     // Photographic and rendered wallpapers: one full-height layer, no cut-out terrain.
                     BitmapFactory.Options full=new BitmapFactory.Options();full.inPreferredConfig=Bitmap.Config.ARGB_8888;
-                    Bitmap photo=BitmapFactory.decodeResource(getResources(),PHOTOS[Math.min(PHOTOS.length-1,style-3)],full);
-                    if(style>=SILVER)photo=soften(photo); // Silver: the silk as a calm, deeply blurred backdrop, no streaks
+                    // Silver's day look is one of the generated backdrops (Backdrops, luma.bg); "silk" is the blurred photo.
+                    Bitmap photo=style!=SILVER?null:bg.equals("mesh")?Backdrops.mesh(width,height):bg.equals("pearl")?Backdrops.pearl(width,height):bg.equals("aerial")?Backdrops.aerial(MainActivity.this,width,height):null;
+                    if(photo==null&&style==SILVER&&!bg.equals("silk"))photo=Backdrops.mesh(width,height); // no aerial downloaded yet
+                    if(photo==null){photo=BitmapFactory.decodeResource(getResources(),PHOTOS[Math.min(PHOTOS.length-1,style-3)],full);if(style>=SILVER)photo=Backdrops.soften(photo);}
                     back=compose(photo,style,false,width,height);photo.recycle();
                     front=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);
                 } else {
