@@ -337,7 +337,9 @@ public final class MainActivity extends Activity {
                         app.tag=tagFor(pkg);
                         Drawable banner=info.activityInfo.applicationInfo.loadBanner(pm);
                         if (banner!=null) app.banner=hd(banner);
-                        if (pkg.equals("com.android.tv.settings")) app.banner=SettingsTile.draw(640,384); // our own gear, not the system's
+                        if (pkg.equals("com.android.tv.settings")) { // the owner's private icon if it is on the TV (see README), else our own gear
+                            Bitmap own=SettingsTile.fromIcon(new java.io.File(getExternalFilesDir("icons"),"settings.png"),640,384);
+                            app.banner=own!=null?own:SettingsTile.draw(640,384); }
                         found.add(app);
                     } catch (RuntimeException ignored) { /* A package can disappear during an update. */ }
                 }

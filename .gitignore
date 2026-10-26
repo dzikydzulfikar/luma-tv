@@ -3,3 +3,7 @@ dist/
 .signing/
 .local/
 .DS_Store
+
+# Private, owner-only assets (kept on the TV and in the local backup, never in this repo)
+private/
+icons/settings.png

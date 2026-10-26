@@ -54,4 +54,20 @@ final class SettingsTile {
         p.setShader(null);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(depth*2);p.setColor(0x40000000);p.setMaskFilter(new BlurMaskFilter(depth,BlurMaskFilter.Blur.NORMAL));
         c.drawCircle(cx,cy-depth*.6f,radius+depth*.4f,p);p.setMaskFilter(null);p.setStyle(Paint.Style.FILL);c.restore();
     }
+    /** The tile from a square app icon kept on the TV only (never in the repository): the icon's middle, where its
+     *  gear sits on its own grey, centred on a tile filled with that same grey, top to bottom. null if unreadable. */
+    static Bitmap fromIcon(java.io.File file,int w,int h){
+        if(file==null||!file.canRead())return null;
+        Bitmap icon=BitmapFactory.decodeFile(file.getPath());if(icon==null)return null;
+        int s=Math.min(icon.getWidth(),icon.getHeight()),inset=Math.round(s*.172f),side=s-inset*2;
+        Bitmap face=Bitmap.createBitmap(icon,inset,inset,side,side);icon.recycle();
+        Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(b);Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG|Paint.DITHER_FLAG);
+        float size=h*.9f,x0=(w-size)/2,y0=(h-size)/2;
+        p.setShader(new LinearGradient(0,y0,0,y0+size,face.getPixel(1,1)|0xFF000000,face.getPixel(1,side-2)|0xFF000000,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,p);p.setShader(null);
+        // The icon's grey continues sideways: its outermost columns, stretched to the tile's edges, so no seam shows.
+        c.drawBitmap(face,new Rect(0,0,2,side),new RectF(0,y0,x0+1,y0+size),p);
+        c.drawBitmap(face,new Rect(side-2,0,side,side),new RectF(x0+size-1,y0,w,y0+size),p);
+        c.drawBitmap(face,null,new RectF(x0,y0,x0+size,y0+size),p);face.recycle();
+        return b;
+    }
 }
