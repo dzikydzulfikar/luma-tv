@@ -106,6 +106,8 @@ final class WeatherWidget extends Widget {
             fillSlots(false);
         }catch(JSONException e){showError("Weather is unavailable right now");}
     }
+    /** 23 as 11PM, 0 as 12AM. */
+    static String hour(int h){return (h%12==0?12:h%12)+(h<12?"AM":"PM");}
     /** Five columns: the next hours (Now first), or the coming days (Today first). */
     private void fillSlots(boolean animate){
         if(data==null)return;
@@ -116,7 +118,7 @@ final class WeatherWidget extends Widget {
                 SimpleDateFormat in=new SimpleDateFormat("yyyy-MM-dd",Locale.US),dayName=new SimpleDateFormat("EEE",Locale.ENGLISH);
                 for(int i=0;i<Math.min(5,times.length());i++){
                     LinearLayout col=new LinearLayout(getContext());col.setOrientation(LinearLayout.VERTICAL);col.setGravity(Gravity.CENTER_HORIZONTAL);
-                    String t=times.getString(i),label=daily?(i==0?"Today":dayName.format(in.parse(t))):(i==0?"Now":t.substring(11,13));
+                    String t=times.getString(i),label=daily?(i==0?"Today":dayName.format(in.parse(t))):(i==0?"Now":hour(Integer.parseInt(t.substring(11,13))));
                     TextView l=text(label,11,ink(0x99),"sans-serif-medium");l.setGravity(Gravity.CENTER);col.addView(l,new LinearLayout.LayoutParams(-1,px(14)));
                     boolean isDay=daily||series.optJSONArray("is_day")==null||series.getJSONArray("is_day").optInt(i,1)==1;
                     Glyph g=new Glyph(getContext()).kind(Glyph.weather(codes.optInt(i),isDay)).color(ink(0xE6));LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(px(19),px(19));gp.topMargin=px(5);gp.bottomMargin=px(5);col.addView(g,gp);

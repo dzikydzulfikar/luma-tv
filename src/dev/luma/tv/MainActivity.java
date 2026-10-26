@@ -56,7 +56,7 @@ public final class MainActivity extends Activity {
     /** Windah's streams, in a row below the first screen of Home, and Recommended for You under it. */
     private Shelf shelf,recommended;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=548,SCROLL=330,ROW_STEP=250;
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=478,SCROLL=260,ROW_STEP=250; // Windah's heading and a strip of its cards peek at the bottom
     private boolean scrolledDown;private int scrollLevel;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
     private void scrollHome(boolean down){scrollHome(down?1:0);}
@@ -260,16 +260,15 @@ public final class MainActivity extends Activity {
     }
     /** Colours of the parts that stay across pages: tab bar, clock and the settings scrim. */
     private void paintChrome(){
-        // The tab bar is one translucent capsule with a hairline rim, as on tvOS 26; only the selected tab is opaque.
-        // The tab bar after the owner's reference (cinejoy.pk's nav): a smoked-glass capsule, rgba(14,14,16,.38) with a
-        // 1px white 7% border and a 1px inner highlight on top; denser on the pale wallpaper so white labels stay legible.
-        // The wallpaper behind it is already blurred, so no live backdrop blur is needed.
+        // The tab bar after the owner's reference (cinejoy.pk's nav), on a light theme: a frosted white capsule (white
+        // about 65%) with a hairline outline, a white inner highlight on top and a soft shadow; on the dark wallpapers
+        // a smoked capsule, rgba(14,14,16,.38). The wallpaper behind is already blurred: no live backdrop blur needed.
         if(tabBar!=null){
-            GradientDrawable fill=shape(light?0x9E0E0E10:0x610E0E10,24);fill.setStroke(Math.max(1,px(.5f)),light?0x1FFFFFFF:0x12FFFFFF);
-            GradientDrawable highlight=shape(Color.TRANSPARENT,24);highlight.setStroke(Math.max(1,px(.5f)),light?0x24FFFFFF:0x12FFFFFF);
+            GradientDrawable fill=shape(light?0xA6FFFFFF:0x610E0E10,24);fill.setStroke(Math.max(1,px(.5f)),light?0x14000000:0x12FFFFFF);
+            GradientDrawable highlight=shape(Color.TRANSPARENT,24);highlight.setStroke(Math.max(1,px(.6f)),light?0xE6FFFFFF:0x12FFFFFF);
             LayerDrawable bar=new LayerDrawable(new Drawable[]{fill,highlight});bar.setLayerInset(1,0,Math.max(1,px(.5f)),0,0);
             tabBar.setBackground(bar);tabBar.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View v,Outline o){o.setRoundRect(0,0,v.getWidth(),v.getHeight(),px(24));o.setAlpha(.5f);}});
-            tabBar.setElevation(px(8));
+            tabBar.setElevation(px(light?6:8));
         }
         if(clock!=null){clock.setTextColor(ink(0xF2));shadow(clock,6);}
         if(sceneryShade!=null)sceneryShade.setBackgroundColor(light?0x73F2F2F5:0x80000000);
@@ -458,7 +457,7 @@ public final class MainActivity extends Activity {
         rows=new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL); rows.setClipChildren(false); rows.setClipToPadding(false);
         rows.setPadding(px(48),px(home?16:10),px(48),px(30));
         scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
-        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 350 : 200));
+        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 314 : 200));
         ArrayList<App> list=visibleApps(!home);
         if (!loaded) {
             rows.addView(text("Finding your apps…",15,ink(0xBB),"sans-serif"));
@@ -666,9 +665,9 @@ public final class MainActivity extends Activity {
         int focused=focusedTab(),index=focused>=0?focused:pageTab();View target=tabs.get(index),row=(View)target.getParent();
         if(target.getWidth()==0){target.post(()->moveTabIndicator(false));return;}
         final float fromX=tabIndicator.getTranslationX(),toX=row.getLeft()+target.getLeft()-((View)row.getParent()).getPaddingLeft();
-        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?Color.WHITE:0x2EFFFFFF;
+        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?Color.WHITE:light?0xE6FFFFFF:0x2EFFFFFF;
         final float fromZ=tabIndicator.getElevation(),toZ=focused>=0?px(4):0; // focused: solid white with a small drop shadow (0 2px 8px); selected: a faint white glass pill
-        final int onPill=focused>=0?0xFF0E0E10:Color.WHITE,offPill=light?0xB3FFFFFF:0x99FFFFFF;
+        final int onPill=focused>=0||light?0xFF1C1C1E:Color.WHITE,offPill=light?0xFF8E8E93:0x99FFFFFF; // light: dark on the pill, mid-grey beside it
         if(tabMove!=null)tabMove.cancel();
         ArgbEvaluator argb=new ArgbEvaluator();
         ValueAnimator.AnimatorUpdateListener step=a->{float f=(float)a.getAnimatedValue();
@@ -1245,7 +1244,7 @@ public final class MainActivity extends Activity {
 
     private final class Art extends View {
         final App app; final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-        final RectF bounds=new RectF();Shader finish;
+        final RectF bounds=new RectF();Shader finish;int edge;
         Art(App app) {super(MainActivity.this);this.app=app;}
         @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
             finish=new LinearGradient(0,0,0,h,new int[]{0x20FFFFFF,0x00FFFFFF,0x14000000},new float[]{0,.46f,1},Shader.TileMode.CLAMP);
@@ -1260,6 +1259,10 @@ public final class MainActivity extends Activity {
                 float ratio=Math.max(w/app.banner.getWidth(),h/app.banner.getHeight());
                 float bw=app.banner.getWidth()*ratio,bh=app.banner.getHeight()*ratio;
                 bounds.set((w-bw)/2,(h-bh)/2,(w+bw)/2,(h+bh)/2);p.setAlpha(255);c.drawBitmap(app.banner,null,bounds,p);
+                // One edge for every tile: a hairline, dark on a light banner (YouTube, Netflix), light on a dark one.
+                if(edge==0){int px=app.banner.getPixel(2,app.banner.getHeight()/2),lum=(Color.red(px)*3+Color.green(px)*6+Color.blue(px))/10;edge=lum>160?0x1F000000:0x1FFFFFFF;}
+                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1,px(.6f)));p.setColor(edge);float in=p.getStrokeWidth()/2;bounds.set(in,in,w-in,h-in);
+                c.drawRoundRect(bounds,px(RADIUS)-in,px(RADIUS)-in,p);p.setStyle(Paint.Style.FILL);
             } else if(pkg.equals("com.google.android.youtube.tv")) {
                 float cx=w/2,cy=h/2;
                 p.setColor(0xFFFF0033);bounds.set(cx-px(25),cy-px(17),cx+px(25),cy+px(17));c.drawRoundRect(bounds,px(10),px(10),p);

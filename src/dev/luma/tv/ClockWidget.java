@@ -44,7 +44,7 @@ final class ClockWidget extends Widget {
             names.add(n);times.add(t);rows.add(row);addView(row,pos(sideW,24,SIDE,0));
         }
         if(style.equals("B")){
-            heroName=text("",15,ink(0xB3),"sans-serif-medium");addView(heroName,pos(140,20,SIDE+2,PAD+8));
+            heroName=text("",15,ink(0xB3),"sans-serif-medium");addView(heroName,pos(sideW,20,SIDE+2,PAD+8));
             heroTime=text("",44,ink(0xFF),"sans-serif-thin");heroTime.setLetterSpacing(-.01f);heroTime.setGravity(Gravity.BOTTOM);addView(heroTime,pos(sideW,50,SIDE,PAD+26));
             countdown=text("",13,ink(0x8C),"sans-serif");addView(countdown,pos(sideW,17,SIDE+2,PAD+80));
             LinearLayout strip=new LinearLayout(context);addView(strip,pos(sideW-2,31,SIDE+2,130)); // columns spread edge to edge
@@ -85,8 +85,11 @@ final class ClockWidget extends Widget {
             rows.get(i).setBackground(lit?round(light()?0x12000000:0x17FFFFFF,8):null);
         }
         if(style.equals("B")){
-            heroName.setText(Prayer.NAMES[next]);heroTime.setText(Prayer.hm(s[next]));
-            int m=Prayer.minutesTo(now.getTime(),s);countdown.setText("in "+(m>=60?m/60+"h "+m%60+"m":m+"m")+(tomorrow(now,s)?" · tomorrow":""));
+            // After Isya everything shown is tomorrow's (Ashar can be a minute off today's): say so beside the name.
+            if(tomorrow(now,s)){SpannableString n=new SpannableString(Prayer.NAMES[next]+"  ·  Tomorrow");n.setSpan(new ForegroundColorSpan(ink(0x80)),Prayer.NAMES[next].length(),n.length(),0);heroName.setText(n);}
+            else heroName.setText(Prayer.NAMES[next]);
+            heroTime.setText(Prayer.hm(s[next]));
+            int m=Prayer.minutesTo(now.getTime(),s);countdown.setText("in "+(m>=60?m/60+"h "+m%60+"m":m+"m"));
             for(int i=0;i<5;i++){boolean lit=i==next;times.get(i).setText(Prayer.hm(s[i]));times.get(i).setTextColor(ink(lit?0xFF:0x8C));names.get(i).setTextColor(ink(lit?0xB3:0x73));}
         }
         if(style.equals("C")){
