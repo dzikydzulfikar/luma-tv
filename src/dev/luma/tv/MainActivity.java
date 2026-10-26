@@ -102,7 +102,7 @@ public final class MainActivity extends Activity {
             handler.postDelayed(this, 15000);
         }
     };
-    private static final String[] FIRST = {"com.google.android.youtube.tv", "com.netflix.ninja", "com.apple.atve.androidtv.appletv", "com.amazon.amazonvideo.livingroom", "com.android.tv.settings", "com.android.vending"};
+    private static final String[] FIRST = {"com.google.android.youtube.tv", "com.netflix.ninja", "com.apple.atve.androidtv.appletv", "com.wbd.stream", "com.android.tv.settings", "com.amazon.amazonvideo.livingroom", "com.android.vending"};
     /** Columns of the app grid, as on tvOS: five wide icons per row. */
     private static final int COLS=5;
     /** Focused icon scale, close to tvOS. */
@@ -125,6 +125,13 @@ public final class MainActivity extends Activity {
         sonic=new SonicFeedback(this);
         daylight=new Daylight(this);
         // 2.2 introduces Silver, light by day and dark after sunset, as the default wallpaper.
+        // Once: HBO Max takes Prime Video's place in the front row; Prime Video moves behind Settings, still in Apps.
+        if(!prefs.getBoolean("hbo_front",false)){
+            ArrayList<String> ids=new ArrayList<>();for(String id:prefs.getString("order","").split(","))if(!id.isEmpty()&&!id.equals("com.wbd.stream"))ids.add(id);
+            int prime=ids.indexOf("com.amazon.amazonvideo.livingroom");
+            if(prime>=0){ids.set(prime,"com.wbd.stream");int settings=ids.indexOf("com.android.tv.settings");ids.add(settings>=0?settings+1:ids.size(),"com.amazon.amazonvideo.livingroom");}
+            prefs.edit().putString("order",ids.isEmpty()?"":String.join(",",ids)).putBoolean("hbo_front",true).apply();
+        }
         if(!prefs.getBoolean("silver_default",false))prefs.edit().putInt("wallpaper",SILVER).putBoolean("silver_default",true).apply();
         light=pale(variant(wallpaperStyle()));
         house=houseInstalled();
@@ -1476,6 +1483,7 @@ public final class MainActivity extends Activity {
         if(pkg.contains("stream.tv"))return 0xFF265EAF;
         if(pkg.contains("tvmusic"))return 0xFF26131B;
         if(pkg.contains("amazon"))return 0xFF142C3E;
+        if(pkg.equals("com.wbd.stream"))return 0xFF0C1020;
         return 0xFF293341;
     }
     private String tagFor(String pkg) {
