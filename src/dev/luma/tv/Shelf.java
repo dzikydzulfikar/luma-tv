@@ -92,7 +92,7 @@ final class Shelf extends FrameLayout {
         Context c=getContext();int w=host.px(272),h=host.px(153);
         FrameLayout card=new FrameLayout(c);card.setFocusable(true);card.setFocusableInTouchMode(true);card.setClipChildren(false);
         FrameLayout face=new FrameLayout(c);GradientDrawable bg=new GradientDrawable();bg.setColor(0xFF2A2A2E);bg.setCornerRadius(host.px(11));
-        face.setBackground(bg);face.setClipToOutline(true);face.setElevation(host.px(2));
+        face.setBackground(bg);face.setClipToOutline(true);face.setLayerType(View.LAYER_TYPE_HARDWARE,null);face.setElevation(host.px(2));
         ImageView image=new ImageView(c);image.setScaleType(ImageView.ScaleType.CENTER_CROP);face.addView(image,new LayoutParams(-1,-1));
         card.addView(face,new LayoutParams(w,h));
         if(video!=null&&video.live){
@@ -110,7 +110,7 @@ final class Shelf extends FrameLayout {
         card.setOnFocusChangeListener((v,f)->{
             float s=f?1.08f:1f;
             face.animate().cancel();
-            face.animate().scaleX(s).scaleY(s).translationY(f?-host.px(3):0).translationZ(f?host.px(16):0).setDuration(f?260:200).setInterpolator(EASE).withLayer().start();
+            face.animate().scaleX(s).scaleY(s).translationY(f?-host.px(3):0).translationZ(f?host.px(10):0).setDuration(f?260:200).setInterpolator(EASE).withLayer().start();
             if(f)glide(v);
         });
         card.setOnClickListener(v->open(video==null?CHANNEL+"/streams":"https://www.youtube.com/watch?v="+video.id));

@@ -1039,7 +1039,8 @@ public final class MainActivity extends Activity {
             super(MainActivity.this);app=item;index=number;
             setClipChildren(false);setClipToPadding(false);setFocusable(true);setFocusableInTouchMode(true);setSoundEffectsEnabled(false);
             setContentDescription(app.label+". OK: open. Hold OK: organize app.");
-            face=new FrameLayout(MainActivity.this);GradientDrawable faceBg=shape(app.color,RADIUS);faceBg.setStroke(Math.max(1,px(.6f)),0x1FFFFFFF);face.setBackground(faceBg);face.setClipToOutline(true);face.setElevation(px(2));face.setCameraDistance(px(900));
+            face=new FrameLayout(MainActivity.this);GradientDrawable faceBg=shape(app.color,RADIUS);faceBg.setStroke(Math.max(1,px(.6f)),0x1FFFFFFF);face.setBackground(faceBg);face.setClipToOutline(true);face.setLayerType(View.LAYER_TYPE_HARDWARE,null); // a cached texture: moving or scaling it never re-clips the rounded corners
+            face.setElevation(px(2));face.setCameraDistance(px(900));
             art=new Art(app);face.addView(art,new FrameLayout.LayoutParams(-1,-1));
             light=new Shine();light.setAlpha(0);face.addView(light,new FrameLayout.LayoutParams(-1,-1));
             rim=shape(Color.TRANSPARENT,RADIUS);rim.setStroke(px(1.2f),0xF0FFFFFF);rim.setAlpha(0);face.setForeground(rim);
@@ -1113,7 +1114,7 @@ public final class MainActivity extends Activity {
         }
         private void lift(long duration,android.view.animation.Interpolator curve){
             float scale=focused?(pressed?LIFT*.94f:LIFT):1f;
-            tile.face.animate().scaleX(scale).scaleY(scale).translationY(focused?-px(4):0).translationZ(focused&&!pressed?px(18):0)
+            tile.face.animate().scaleX(scale).scaleY(scale).translationY(focused?-px(4):0).translationZ(focused&&!pressed?px(10):0)
                 .rotationX(0).rotationY(0).setDuration(duration).setInterpolator(curve).withLayer().start();
         }
         void start(){lift(220,decelerate);}
@@ -1121,7 +1122,7 @@ public final class MainActivity extends Activity {
         void snap(){
             stop();pressed=false;
             float scale=focused?LIFT:1;
-            tile.face.setScaleX(scale);tile.face.setScaleY(scale);tile.face.setTranslationY(focused?-px(4):0);tile.face.setTranslationZ(focused?px(18):0);
+            tile.face.setScaleX(scale);tile.face.setScaleY(scale);tile.face.setTranslationY(focused?-px(4):0);tile.face.setTranslationZ(focused?px(10):0);
             tile.face.setRotationX(0);tile.face.setRotationY(0);
             tile.art.setTranslationX(0);tile.art.setTranslationY(0);tile.light.setTranslationX(0);tile.light.setAlpha(focused?.4f:0);
         }
