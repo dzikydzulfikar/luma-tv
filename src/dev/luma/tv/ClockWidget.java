@@ -20,7 +20,7 @@ import java.util.*;
  *  so nothing takes focus. It ticks once a minute, on the minute, while Home is visible, which also moves the next
  *  prayer on as each one passes and turns the day over at midnight. */
 final class ClockWidget extends Widget {
-    static String style="A";
+    static String style="B"; // the owner's choice; A, C and D stay as hidden looks
     static final float PAD=28,DIV=296,SIDE=DIV+20,ROW_GAP=2;
     private final TextView time,date,ac;
     private final ArrayList<TextView> names=new ArrayList<>(),times=new ArrayList<>();
