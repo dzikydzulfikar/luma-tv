@@ -42,7 +42,7 @@ final class WidgetBoard extends FrameLayout {
         case "music":return "What's playing on this TV, with play, pause and skip.";
         case "inputs":return "Your HDMI devices and live TV: switch to a console or a set-top box in one press.";
         default:return "Wi-Fi, picture and sound, accessories and settings in one place.";}}
-    static float width(String id){switch(id){case "clock":return 560;case "upnext":return 560;case "weather":return 288;case "inputs":return InputsWidget.widthFor(InputsWidget.count);default:return 424;}}
+    static float width(String id){switch(id){case "clock":return ClockWidget.style.equals("D")?288:560;case "upnext":return 560;case "weather":return 288;case "inputs":return InputsWidget.widthFor(InputsWidget.count);default:return 424;}}
 
     /** All widgets in the saved order, and which of them are on. A widget added in a later version goes in after
      *  the one it follows in IDS. */
@@ -85,6 +85,7 @@ final class WidgetBoard extends FrameLayout {
         for(int p=0;p<layout.size();p++){
             FrameLayout page=new FrameLayout(context);page.setClipChildren(false);page.setClipToPadding(false);
             ArrayList<Widget> list=new ArrayList<>();float x=X;
+            if(ClockWidget.style.equals("D")&&layout.get(p).contains("clock")){float used=-GAP;for(String id:layout.get(p))used+=width(id)+GAP;x+=(ROW_W-used)/2;} // the narrow clock: centre the row
             for(String id:layout.get(p)){
                 if(id.equals("house"))continue;
                 Widget w=create(id);if(w==null)continue;

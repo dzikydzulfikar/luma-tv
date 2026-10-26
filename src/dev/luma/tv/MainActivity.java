@@ -118,6 +118,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("luma", MODE_PRIVATE);
+        ClockWidget.style=prefs.getString("clock_style","A");
         unit = getResources().getDisplayMetrics().widthPixels / 960f;
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
@@ -164,6 +165,8 @@ public final class MainActivity extends Activity {
         String look=intent.getStringExtra("luma.daylight");
         if(look!=null&&look.matches("day|night|auto")){daylightOverride=look;if(started)syncDaylight();}
         String demo=intent.getStringExtra("luma.demo");if(demo!=null){Promo.on=demo.equals("promo");if(Promo.on)Promo.start();board=null;homePage=0;showPage("home",true);} // board=null: start on the first page
+        String clockStyle=intent.getStringExtra("luma.clock"); // a hidden switch between the clock card's looks (ClockWidget)
+        if(clockStyle!=null&&clockStyle.matches("[ABCD]")){ClockWidget.style=clockStyle;prefs.edit().putString("clock_style",clockStyle).apply();board=null;homePage=0;showPage("home",true);}
         String inputs=intent.getStringExtra("luma.inputs");if(inputs!=null){InputsWidget.demo=inputs.equals("demo");showPage(page,true);} // arrives while paused
         if (intent.hasCategory(Intent.CATEGORY_HOME)){selectedPackage="com.google.android.youtube.tv";if(started)homePage=0;showPage("home", true);} // Home pressed on Home: back to the first page
     }

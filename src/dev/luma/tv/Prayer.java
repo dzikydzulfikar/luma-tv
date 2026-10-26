@@ -14,7 +14,8 @@ final class Prayer {
     static final TimeZone ZONE=TimeZone.getTimeZone("Asia/Jakarta");
     static final double IHTIYATH=2;
 
-    /** Minutes after local midnight of the five prayers on a day (Calendar fields of that day). */
+    /** Minutes after local midnight of the five prayers on a day (Calendar fields of that day), then sunrise and
+     *  sunset (sunrise, like the Majelis Tarjih's "terbit", 2 minutes early; sunset as it is). */
     static int[] times(int year,int month,int day,double lat,double lon){
         Calendar c=Calendar.getInstance(ZONE);c.clear();c.set(year,month-1,day);
         double tz=ZONE.getOffset(c.getTimeInMillis())/3600000.0;
@@ -23,7 +24,8 @@ final class Prayer {
         double asr=Math.toDegrees(Math.atan(1/(1+Math.tan(Math.abs(p-noonDec)))));
         double[] h={event(jd0,5,-18,-1,p,lat,lon,tz),event(jd0,12,Double.NaN,0,p,lat,lon,tz),event(jd0,15,asr,1,p,lat,lon,tz),
             event(jd0,18,-.8333,1,p,lat,lon,tz),event(jd0,19,-18,1,p,lat,lon,tz)};
-        int[] out=new int[5];for(int i=0;i<5;i++)out[i]=(int)Math.floor(h[i]*60+IHTIYATH);
+        int[] out=new int[7];for(int i=0;i<5;i++)out[i]=(int)Math.floor(h[i]*60+IHTIYATH);
+        out[5]=(int)Math.floor(event(jd0,6,-.8333,-1,p,lat,lon,tz)*60-IHTIYATH+1);out[6]=(int)Math.floor(h[3]*60);
         return out;
     }
     /** Local hour when the sun reaches an altitude (NaN: noon), before (-1) or after (+1) noon, refined with the
@@ -46,17 +48,20 @@ final class Prayer {
         double eqt=q/15-((ra%24+24)%24);eqt=((eqt+12)%24+24)%24-12;
         return new double[]{Math.asin(Math.sin(e)*Math.sin(l)),eqt};
     }
-    /** The next two prayers from a moment, as "Isya 18:58 · Subuh 04:18"; after Isya they are tomorrow's. */
-    static String upcoming(long now){
+    /** The times to show at a moment (as times() gives them) and, last, the index of the next prayer: today's,
+     *  or after Isya tomorrow's with Subuh next. */
+    static int[] schedule(long now){
         Calendar c=Calendar.getInstance(ZONE);c.setTimeInMillis(now);
-        int minute=c.get(Calendar.HOUR_OF_DAY)*60+c.get(Calendar.MINUTE);
-        StringBuilder out=new StringBuilder();int found=0;
-        for(int day=0;day<2&&found<2;day++){
-            int[] t=times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON);
-            for(int i=0;i<5&&found<2;i++)if(day>0||t[i]>minute){out.append(found++>0?" · ":"").append(NAMES[i]).append(' ').append(hm(t[i]));}
-            c.add(Calendar.DAY_OF_MONTH,1);
-        }
-        return out.toString();
+        int minute=c.get(Calendar.HOUR_OF_DAY)*60+c.get(Calendar.MINUTE),next=-1;
+        int[] t=times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON);
+        for(int i=4;i>=0;i--)if(t[i]>minute)next=i;
+        if(next<0){c.add(Calendar.DAY_OF_MONTH,1);t=times(c.get(Calendar.YEAR),c.get(Calendar.MONTH)+1,c.get(Calendar.DAY_OF_MONTH),LAT,LON);next=0;}
+        int[] out=Arrays.copyOf(t,8);out[7]=next;return out;
+    }
+    /** Minutes from a moment to the next prayer in schedule(). */
+    static int minutesTo(long now,int[] schedule){
+        Calendar c=Calendar.getInstance(ZONE);c.setTimeInMillis(now);
+        int d=schedule[schedule[7]]-(c.get(Calendar.HOUR_OF_DAY)*60+c.get(Calendar.MINUTE));return d<=0?d+1440:d;
     }
     static String hm(int m){return String.format(Locale.ROOT,"%02d:%02d",m/60,m%60);}
 }

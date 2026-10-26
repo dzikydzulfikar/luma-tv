@@ -52,10 +52,13 @@ public final class PrayerTest {
         StringBuilder today=new StringBuilder();int[] t=Prayer.times(2026,10,26,Prayer.LAT,Prayer.LON);
         for(int i=0;i<5;i++)today.append(Prayer.NAMES[i]).append(' ').append(Prayer.hm(t[i])).append(i<4?", ":"");
         if(!today.toString().equals("Subuh 04:18, Dzuhur 11:38, Ashar 14:51, Maghrib 17:47, Isya 18:58"))throw new AssertionError(today);
-        // 20:00 WIB on 26 Oct 2026 is after Isya: tomorrow's Subuh and Dzuhur; 18:00 is between Maghrib and Isya.
-        String night=Prayer.upcoming(1793019600000L),evening=Prayer.upcoming(1793019600000L-2*3600000L);
-        if(!night.equals("Subuh 04:18 · Dzuhur 11:38"))throw new AssertionError(night);
-        if(!evening.equals("Isya 18:58 · Subuh 04:18"))throw new AssertionError(evening);
+        // 18:00 WIB on 26 Oct 2026: Isya is next; 20:00 is after Isya, so tomorrow's times with Subuh next.
+        int[] evening=Prayer.schedule(1793019600000L-2*3600000L),night=Prayer.schedule(1793019600000L);
+        if(evening[7]!=4||evening[4]!=18*60+58)throw new AssertionError("evening "+java.util.Arrays.toString(evening));
+        if(night[7]!=0||night[0]!=4*60+18)throw new AssertionError("night "+java.util.Arrays.toString(night));
+        if(Prayer.minutesTo(1793019600000L-2*3600000L,evening)!=58)throw new AssertionError("countdown");
+        // Terbit in the same table: 05:57 on 18 Feb, 05:55 on 19 Mar.
+        if(Prayer.times(2026,2,18,lat,lon)[5]!=5*60+57||Prayer.times(2026,3,19,lat,lon)[5]!=5*60+55)throw new AssertionError("terbit");
         System.out.println("ok: "+exact+" of "+n+" times exact; 26 Oct 2026 Setiabudi: "+today);
     }
 }
