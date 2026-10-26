@@ -1338,9 +1338,13 @@ public final class MainActivity extends Activity {
             @Override public void surfaceCreated(SurfaceHolder holder){drawSurface();}
             @Override public void surfaceChanged(SurfaceHolder holder,int format,int w,int h){drawSurface();}
             @Override public void surfaceDestroyed(SurfaceHolder holder){animate().cancel();}
+            /** A request that arrives while a draw is queued is not dropped but runs once more afterwards: Silver resizes
+             *  the sky surface to full height right after asking for a draw, and the draw for the new size used to be lost,
+             *  leaving the lower half of the screen black. */
+            final java.util.concurrent.atomic.AtomicBoolean drawAgain=new java.util.concurrent.atomic.AtomicBoolean();
             void drawSurface() {
-                if(!drawPending.compareAndSet(false,true))return;
-                surfaceHandler.post(()->{try{drawSurfaceNow();}finally{drawPending.set(false);}});
+                if(!drawPending.compareAndSet(false,true)){drawAgain.set(true);return;}
+                surfaceHandler.post(()->{try{drawSurfaceNow();}finally{drawPending.set(false);if(drawAgain.getAndSet(false))drawSurface();}});
             }
             void drawSurfaceNow() {
                 if(!getHolder().getSurface().isValid())return;
