@@ -45,7 +45,8 @@ final class Shelf extends FrameLayout {
         heading=new TextView(context);heading.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,host.px(15));
         heading.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));heading.setIncludeFontPadding(false);
         LayoutParams hp=new LayoutParams(-2,-2);hp.leftMargin=host.px(50);addView(heading,hp);
-        scroll=new HorizontalScrollView(context);scroll.setHorizontalScrollBarEnabled(false);scroll.setClipChildren(false);scroll.setClipToPadding(false);
+        // The row scrolls itself (see glide): the platform's jump-to-focus is turned off.
+        scroll=new HorizontalScrollView(context){@Override protected int computeScrollDeltaToGetChildRectOnScreen(android.graphics.Rect rect){return 0;}};scroll.setHorizontalScrollBarEnabled(false);scroll.setClipChildren(false);scroll.setClipToPadding(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);scroll.setPadding(host.px(48),host.px(14),host.px(48),0);
         row=new LinearLayout(context);row.setClipChildren(false);row.setClipToPadding(false);
         scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));
@@ -90,10 +91,9 @@ final class Shelf extends FrameLayout {
     private void addCard(Streams.Video video,int index){
         Context c=getContext();int w=host.px(272),h=host.px(153);
         FrameLayout card=new FrameLayout(c);card.setFocusable(true);card.setFocusableInTouchMode(true);card.setClipChildren(false);
-        FrameLayout face=new FrameLayout(c);GradientDrawable bg=new GradientDrawable();bg.setColor(0xFF2A2A2E);bg.setCornerRadius(host.px(12));
+        FrameLayout face=new FrameLayout(c);GradientDrawable bg=new GradientDrawable();bg.setColor(0xFF2A2A2E);bg.setCornerRadius(host.px(11));
         face.setBackground(bg);face.setClipToOutline(true);face.setElevation(host.px(2));
         ImageView image=new ImageView(c);image.setScaleType(ImageView.ScaleType.CENTER_CROP);face.addView(image,new LayoutParams(-1,-1));
-        GradientDrawable rim=new GradientDrawable();rim.setCornerRadius(host.px(12));rim.setStroke(host.px(1.5f),0xF0FFFFFF);rim.setAlpha(0);face.setForeground(rim);
         card.addView(face,new LayoutParams(w,h));
         if(video!=null&&video.live){
             TextView badge=new TextView(c);badge.setText("LIVE");badge.setTextColor(Color.WHITE);badge.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,host.px(10));
@@ -108,9 +108,10 @@ final class Shelf extends FrameLayout {
         LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(w,-1);if(index>0)cp.leftMargin=host.px(18);row.addView(card,cp);
         if(video==null)image.setImageResource(R.drawable.windah_banner);else thumb(video,image);
         card.setOnFocusChangeListener((v,f)->{
-            float s=f?1.07f:1f;face.animate().scaleX(s).scaleY(s).translationY(f?-host.px(3):0).setDuration(200).start();
-            face.setElevation(host.px(f?14:2));rim.setAlpha(f?210:0);
-            if(f&&index==0)scroll.smoothScrollTo(0,0);
+            float s=f?1.08f:1f;
+            face.animate().cancel();
+            face.animate().scaleX(s).scaleY(s).translationY(f?-host.px(3):0).translationZ(f?host.px(16):0).setDuration(f?260:200).setInterpolator(EASE).withLayer().start();
+            if(f)glide(v);
         });
         card.setOnClickListener(v->open(video==null?CHANNEL+"/streams":"https://www.youtube.com/watch?v="+video.id));
         card.setOnKeyListener((v,key,e)->{
@@ -121,6 +122,17 @@ final class Shelf extends FrameLayout {
             if(key==KeyEvent.KEYCODE_DPAD_RIGHT&&index==row.getChildCount()-1)return true;
             return false;
         });
+    }
+
+    private static final android.view.animation.Interpolator EASE=new android.view.animation.DecelerateInterpolator(1.6f);
+    private android.animation.ObjectAnimator slide;
+    /** tvOS keeps the focused card in place at the left and moves the row under it, with one eased glide. */
+    private void glide(View card){
+        int target=Math.max(0,Math.min(card.getLeft(),row.getWidth()-scroll.getWidth()+scroll.getPaddingLeft()+scroll.getPaddingRight()));
+        if(slide!=null)slide.cancel();
+        if(target==scroll.getScrollX())return;
+        slide=android.animation.ObjectAnimator.ofInt(scroll,"scrollX",scroll.getScrollX(),target);
+        slide.setDuration(320);slide.setInterpolator(EASE);slide.start();
     }
 
     /** Opens a YouTube link in the official YouTube app; another handler only if that app cannot take it. */
