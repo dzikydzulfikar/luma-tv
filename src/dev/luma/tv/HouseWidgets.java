@@ -35,7 +35,7 @@ final class HouseWidgets extends FrameLayout {
     final WebView model;
     final ImageView still,after;
     final PathInterpolator ease=new PathInterpolator(.22f,1f,.36f,1f);
-    final android.view.animation.Interpolator spring=t->{if(t>=1)return 1;double time=t*.42,f=24,d=.7,w=f*Math.sqrt(1-d*d);return (float)(1-Math.exp(-d*f*time)*(Math.cos(w*time)+d*f/w*Math.sin(w*time)));};
+    final android.view.animation.Interpolator spring=t->{if(t>=1)return 1;double time=t*.42,f=24;return (float)(1-(1+f*time)*Math.exp(-f*time));}; // critically damped: settles without overshoot
     /** The last picture of the model by day [1] and by night [0], kept across page rebuilds: Home shows the house at
      *  once while WebGL starts again, also after sunset once a night picture exists. */
     static final Bitmap[] lastPicture=new Bitmap[2];static float lastTvX=.5f,lastTvY=.5f;

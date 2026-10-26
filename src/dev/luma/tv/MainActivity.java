@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     /** Windah's streams, in a row below the first screen of Home. */
     private Shelf shelf;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=11,SHELF_Y=548,SCROLL=330;
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=548,SCROLL=330;
     private boolean scrolledDown;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
     private void scrollHome(boolean down){
@@ -89,11 +89,11 @@ public final class MainActivity extends Activity {
     private String heroPackage="";
     private final android.view.animation.Interpolator ease = new PathInterpolator(.22f,1f,.36f,1f);
     private final android.view.animation.Interpolator drift = new PathInterpolator(.2f,.72f,.25f,1f);
+    /** Focus and selection settle on a critically damped spring: quick, and never past the mark. */
     private final android.view.animation.Interpolator spring = t -> {
         if(t>=1)return 1;
-        double time=t*.42,frequency=25,damping=.72;
-        double damped=frequency*Math.sqrt(1-damping*damping);
-        return (float)(1-Math.exp(-damping*frequency*time)*(Math.cos(damped*time)+damping*frequency/damped*Math.sin(damped*time)));
+        double time=t*.42,frequency=25;
+        return (float)(1-(1+frequency*time)*Math.exp(-frequency*time));
     };
     private final Runnable clockTick = new Runnable() {
         public void run() {
@@ -856,6 +856,8 @@ public final class MainActivity extends Activity {
     private void preview(int thumb,String title,String body){
         if(previewImage==null)return;
         if(thumb!=0){previewImage.setImageResource(thumb);previewImage.setAlpha(1f);}else previewImage.setAlpha(.35f);
+        // Silver is shown blurred, as the wallpaper now is (see Wallpaper.soften).
+        if(Build.VERSION.SDK_INT>=31)previewImage.setRenderEffect(thumb==THUMBS[SILVER]?RenderEffect.createBlurEffect(px(14),px(14),Shader.TileMode.CLAMP):null);
         previewTitle.setText(title);previewBody.setText(body);
     }
     private void settings(boolean focus) {
@@ -872,7 +874,7 @@ public final class MainActivity extends Activity {
         sv.addView(list);settingsScroll=sv;
         FrameLayout frame=new FrameLayout(this); frame.setTag("scroll-frame"); frame.addView(sv,new FrameLayout.LayoutParams(-1,-1)); content.addView(frame,pos(520,400,26,138));
         // live preview on the right
-        FrameLayout card=new FrameLayout(this);card.setBackground(shape(glass(),22));card.setClipToOutline(true);
+        FrameLayout card=new FrameLayout(this);card.setBackground(shape(glass(),Widget.RADIUS));card.setClipToOutline(true);
         previewImage=new ImageView(this);previewImage.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(previewImage,pos(352,198,0,0));
         previewTitle=text("",19,ink(0xFF),"sans-serif-medium");card.addView(previewTitle,pos(320,26,18,214));
         previewBody=text("",13,ink(0xC2),"sans-serif");previewBody.setLineSpacing(px(4),1);card.addView(previewBody,pos(316,80,18,246));
@@ -1080,7 +1082,7 @@ public final class MainActivity extends Activity {
         if(detail!=null){detail.setGravity(Gravity.RIGHT);row.addView(detail,pos(200,20,258,12));}
         final View track=new View(this),knob=new View(this);
         if(toggle!=null){row.addView(track,pos(40,24,418,9));row.addView(knob,pos(20,20,420,11));}
-        Runnable paint=()->{boolean f=row.hasFocus();row.setBackground(shape(f?0xFAFFFFFF:light?0x8CFFFFFF:0x14FFFFFF,14));name.setTextColor(f?0xFF111827:ink(0xFF));
+        Runnable paint=()->{boolean f=row.hasFocus();row.setBackground(shape(f?0xFAFFFFFF:light?0x8CFFFFFF:0x14FFFFFF,RADIUS));name.setTextColor(f?0xFF111827:ink(0xFF));
             if(detail!=null)detail.setTextColor(f?0xFF5B6472:ink(0x99));
             if(toggle!=null){boolean on=toggle.equals("motion")?motion():prefs.getBoolean(toggle,true);track.setBackground(shape(on?0xFF34C759:f||light?0x2E111827:0x33FFFFFF,12));knob.setBackground(shape(Color.WHITE,10));knob.setElevation(px(1.5f));
                 float x=on?px(16):0;knob.animate().cancel();if(motion())knob.animate().translationX(x).setDuration(260).setInterpolator(spring).start();else knob.setTranslationX(x);}};
@@ -1354,6 +1356,14 @@ public final class MainActivity extends Activity {
             }
             return result;
         }
+        /** A wide blur made once, off the UI thread: shrink in steps, then grow back with filtering. A still bitmap costs
+         *  nothing per frame, unlike a live blur behind the cards. */
+        private Bitmap soften(Bitmap photo){
+            int w=photo.getWidth(),h=photo.getHeight();Bitmap b=photo;
+            for(int k:new int[]{4,16,48}){Bitmap n=Bitmap.createScaledBitmap(b,Math.max(1,w/k),Math.max(1,h/k),true);if(b!=photo)b.recycle();b=n;}
+            for(int k:new int[]{16,4}){Bitmap n=Bitmap.createScaledBitmap(b,w/k,h/k,true);b.recycle();b=n;}
+            photo.recycle();return b;
+        }
         void update(){show(wallpaperStyle());}
         /** Fill under the picture: pale silver, graphite, or the night blue of the original scenes. */
         int base(int style){return pale(style)?0xFFE4E5E8:style>=SILVER?0xFF0B0B0D:0xFF080C14;}
@@ -1370,6 +1380,7 @@ public final class MainActivity extends Activity {
                     // Photographic and rendered wallpapers: one full-height layer, no cut-out terrain.
                     BitmapFactory.Options full=new BitmapFactory.Options();full.inPreferredConfig=Bitmap.Config.ARGB_8888;
                     Bitmap photo=BitmapFactory.decodeResource(getResources(),PHOTOS[Math.min(PHOTOS.length-1,style-3)],full);
+                    if(style>=SILVER)photo=soften(photo); // Silver: the silk as a calm, deeply blurred backdrop, no streaks
                     back=compose(photo,style,false,width,height);photo.recycle();
                     front=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);
                 } else {

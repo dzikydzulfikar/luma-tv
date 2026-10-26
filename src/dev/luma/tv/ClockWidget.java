@@ -21,7 +21,7 @@ import java.util.*;
  *  prayer on as each one passes and turns the day over at midnight. */
 final class ClockWidget extends Widget {
     static String style="B"; // the owner's choice; A, C and D stay as hidden looks
-    static final float PAD=28,DIV=296,SIDE=DIV+20,ROW_GAP=2;
+    static final float PAD=24,DIV=296,SIDE=DIV+24,ROW_GAP=2; // PAD: the padding of every Home card
     private final TextView time,date,ac;
     private final ArrayList<TextView> names=new ArrayList<>(),times=new ArrayList<>();
     private final ArrayList<View> rows=new ArrayList<>();
@@ -44,10 +44,10 @@ final class ClockWidget extends Widget {
             names.add(n);times.add(t);rows.add(row);addView(row,pos(sideW,24,SIDE,0));
         }
         if(style.equals("B")){
-            heroName=text("",15,ink(0xB3),"sans-serif-medium");addView(heroName,pos(140,20,SIDE+2,PAD));
-            heroTime=text("",44,ink(0xFF),"sans-serif-thin");heroTime.setLetterSpacing(-.01f);heroTime.setGravity(Gravity.BOTTOM);addView(heroTime,pos(sideW,50,SIDE,PAD+18));
-            countdown=text("",13,ink(0x8C),"sans-serif");addView(countdown,pos(sideW,17,SIDE+2,PAD+72));
-            LinearLayout strip=new LinearLayout(context);addView(strip,pos(sideW-2,31,SIDE+2,122)); // columns spread edge to edge
+            heroName=text("",15,ink(0xB3),"sans-serif-medium");addView(heroName,pos(140,20,SIDE+2,PAD+8));
+            heroTime=text("",44,ink(0xFF),"sans-serif-thin");heroTime.setLetterSpacing(-.01f);heroTime.setGravity(Gravity.BOTTOM);addView(heroTime,pos(sideW,50,SIDE,PAD+26));
+            countdown=text("",13,ink(0x8C),"sans-serif");addView(countdown,pos(sideW,17,SIDE+2,PAD+80));
+            LinearLayout strip=new LinearLayout(context);addView(strip,pos(sideW-2,31,SIDE+2,130)); // columns spread edge to edge
             for(int i=0;i<5;i++){
                 if(i>0)strip.addView(new View(context),new LinearLayout.LayoutParams(0,1,1));
                 LinearLayout col=new LinearLayout(context);col.setOrientation(LinearLayout.VERTICAL);strip.addView(col,new LinearLayout.LayoutParams(-2,-1));
@@ -86,7 +86,7 @@ final class ClockWidget extends Widget {
         }
         if(style.equals("B")){
             heroName.setText(Prayer.NAMES[next]);heroTime.setText(Prayer.hm(s[next]));
-            int m=Prayer.minutesTo(now.getTime(),s);countdown.setText("in "+(m>=60?m/60+"h "+m%60+"m":m+"m"));
+            int m=Prayer.minutesTo(now.getTime(),s);countdown.setText("in "+(m>=60?m/60+"h "+m%60+"m":m+"m")+(tomorrow(now,s)?" · tomorrow":""));
             for(int i=0;i<5;i++){boolean lit=i==next;times.get(i).setText(Prayer.hm(s[i]));times.get(i).setTextColor(ink(lit?0xFF:0x8C));names.get(i).setTextColor(ink(lit?0xB3:0x73));}
         }
         if(style.equals("C")){
@@ -94,6 +94,8 @@ final class ClockWidget extends Widget {
             times.get(2).setText(Prayer.hm(s[next]));names.get(2).setText(Prayer.NAMES[next]);
         }
     }
+    /** After Isya the list is tomorrow's (its Ashar can differ by a minute from today's). */
+    private static boolean tomorrow(Date now,int[] s){Calendar c=Calendar.getInstance(Prayer.ZONE);c.setTime(now);return s[7]==0&&c.get(Calendar.HOUR_OF_DAY)>=12;}
     /** Look A: five rows centred in the card, or shorter rows under the AC chip when it shows. Look D: the time and
      *  date lift to make room for the chip below them. */
     private void place(){

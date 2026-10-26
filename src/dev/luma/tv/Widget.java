@@ -13,11 +13,13 @@ abstract class Widget extends FrameLayout {
     final WidgetBoard.Host host;
     final float w;
     final PathInterpolator ease=new PathInterpolator(.22f,1f,.36f,1f);
-    final android.view.animation.Interpolator spring=t->{if(t>=1)return 1;double time=t*.42,f=24,d=.7,q=f*Math.sqrt(1-d*d);return (float)(1-Math.exp(-d*f*time)*(Math.cos(q*time)+d*f/q*Math.sin(q*time)));};
+    final android.view.animation.Interpolator spring=t->{if(t>=1)return 1;double time=t*.42,f=24;return (float)(1-(1+f*time)*Math.exp(-f*time));}; // critically damped: settles without overshoot
     boolean active;
+    /** One radius for every card on Home (the settings preview uses it too). */
+    static final float RADIUS=24;
     Widget(Context context,WidgetBoard.Host host,float width){
         super(context);this.host=host;w=width;setClipChildren(false);setClipToPadding(false);
-        GradientDrawable bg=round(light()?0x8CFFFFFF:0x1FFFFFFF,22);bg.setStroke(Math.max(1,px(.8f)),light()?0x14000000:0x1FFFFFFF);setBackground(bg);
+        GradientDrawable bg=round(light()?0x8CFFFFFF:0x1FFFFFFF,RADIUS);bg.setStroke(Math.max(1,px(.8f)),light()?0x14000000:0x1FFFFFFF);setBackground(bg);
     }
     /** Starts or stops the widget's own work (listeners, timers); only the visible page is active. */
     void setActive(boolean value){active=value;}
@@ -45,7 +47,7 @@ abstract class Widget extends FrameLayout {
         v.setOnFocusChangeListener((view,f)->{
             paint.accept(f);v.animate().cancel();float s=f?scale:1;
             if(motion())v.animate().scaleX(s).scaleY(s).setDuration(f?460:300).setInterpolator(f?spring:ease).start();else{v.setScaleX(s);v.setScaleY(s);}
-            v.setElevation(px(f?12:0));
+            v.setTranslationZ(px(f?10:0)); // the same lift as the app tiles
             if(f){String[] h=hero.get();host.hero(h[0],h[1],h[2]);host.step(index);}
         });
         v.setOnClickListener(view->{host.open();press(v,scale);click.run();});

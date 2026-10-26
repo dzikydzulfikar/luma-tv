@@ -91,7 +91,7 @@ final class Shelf extends FrameLayout {
     private void addCard(Streams.Video video,int index){
         Context c=getContext();int w=host.px(272),h=host.px(153);
         FrameLayout card=new FrameLayout(c);card.setFocusable(true);card.setFocusableInTouchMode(true);card.setClipChildren(false);
-        FrameLayout face=new FrameLayout(c);GradientDrawable bg=new GradientDrawable();bg.setColor(0xFF2A2A2E);bg.setCornerRadius(host.px(11));
+        FrameLayout face=new FrameLayout(c);GradientDrawable bg=new GradientDrawable();bg.setColor(0xFF2A2A2E);bg.setCornerRadius(host.px(12)); // the radius of the app tiles
         face.setBackground(bg);face.setClipToOutline(true);face.setLayerType(View.LAYER_TYPE_HARDWARE,null);face.setElevation(host.px(2));
         ImageView image=new ImageView(c);image.setScaleType(ImageView.ScaleType.CENTER_CROP);face.addView(image,new LayoutParams(-1,-1));
         card.addView(face,new LayoutParams(w,h));

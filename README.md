@@ -29,7 +29,7 @@
 > licence below still applies.
 >
 > The clock card also shows today's prayers for Jakarta (Muhammadiyah's criteria, computed offline) in one of four
-> looks, switched with `adb shell am start -n dev.luma.tv/.MainActivity --es luma.clock A` (`A` list, `B` next
+> looks (default `B`), switched with `adb shell am start -n dev.luma.tv/.MainActivity --es luma.clock A` (`A` list, `B` next
 > prayer large, `C` sunrise, sunset and next prayer, `D` no prayers, narrow centred clock).
 
 ## What it does

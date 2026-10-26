@@ -22,7 +22,7 @@ import org.json.*;
  *  the next hours and the coming days. */
 final class WeatherWidget extends Widget {
     static final long FRESH=30*60000L;
-    static final float PAD=18,SLOTS_Y=114;
+    static final float PAD=24,SLOTS_Y=114; // the padding of every Home card
     final TextView city,temp,condition,range,error;
     final Glyph glyph;
     final LinearLayout slots;
@@ -53,7 +53,7 @@ final class WeatherWidget extends Widget {
         if(value&&!was)post(tick);
     }
     private void paintFocus(){
-        GradientDrawable bg=round(focused?(light()?0xF2FFFFFF:0x38FFFFFF):(light()?0x8CFFFFFF:0x1FFFFFFF),22);
+        GradientDrawable bg=round(focused?(light()?0xF2FFFFFF:0x38FFFFFF):(light()?0x8CFFFFFF:0x1FFFFFFF),RADIUS);
         bg.setStroke(Math.max(1,px(focused?1.2f:.8f)),focused?(light()?0x33000000:0xB3FFFFFF):(light()?0x14000000:0x1FFFFFFF));setBackground(bg);
         animate().cancel();float s=focused?1.04f:1;
         // A modest shadow: the card is large, and its shadow is drawn every frame.
