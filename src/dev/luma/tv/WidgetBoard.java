@@ -14,7 +14,7 @@ import java.util.concurrent.*;
  *  this board. The favourites stay below every page. Left and Right past the last control of a page turn the page;
  *  focus moves inside a page with the platform's FocusFinder, limited to that page. */
 final class WidgetBoard extends FrameLayout {
-    static final float W=960,H=392,X=48,ROW_Y=190,ROW_H=186,ROW_W=864,GAP=16,DOTS_Y=380;
+    static final float W=960,H=392,X=48,ROW_Y=146,ROW_H=186,ROW_W=864,GAP=16,DOTS_Y=380;
     /** Every widget, in the default order. */
     static final String[] IDS={"house","upnext","weather","inputs","control","music"};
     /** Widgets do their network and disk work here, away from the launcher's own loader (wallpapers, apps). */
@@ -33,7 +33,7 @@ final class WidgetBoard extends FrameLayout {
         void launch(String pkg);void start(Intent intent);
         SharedPreferences prefs();Activity activity();
     }
-    static String title(String id){switch(id){case "house":return "Smart Home";case "inputs":return "Inputs";case "upnext":return "Up Next";case "weather":return "Weather";case "music":return "Now Playing";default:return "Control";}}
+    static String title(String id){switch(id){case "clock":return "Clock";case "house":return "Smart Home";case "inputs":return "Inputs";case "upnext":return "Up Next";case "weather":return "Weather";case "music":return "Now Playing";default:return "Control";}}
     static String glyph(String id){switch(id){case "house":return "home";case "inputs":return "hdmi";case "upnext":return "tv";case "weather":return "partly";case "music":return "note";default:return "gear";}}
     static String about(String id){switch(id){
         case "house":return "Scenes and your live 3D home, from House Control TV.";
@@ -42,7 +42,7 @@ final class WidgetBoard extends FrameLayout {
         case "music":return "What's playing on this TV, with play, pause and skip.";
         case "inputs":return "Your HDMI devices and live TV: switch to a console or a set-top box in one press.";
         default:return "Wi-Fi, picture and sound, accessories and settings in one place.";}}
-    static float width(String id){switch(id){case "upnext":return 560;case "weather":return 288;case "inputs":return InputsWidget.widthFor(InputsWidget.count);default:return 424;}}
+    static float width(String id){switch(id){case "clock":return 560;case "upnext":return 560;case "weather":return 288;case "inputs":return InputsWidget.widthFor(InputsWidget.count);default:return 424;}}
 
     /** All widgets in the saved order, and which of them are on. A widget added in a later version goes in after
      *  the one it follows in IDS. */
@@ -102,6 +102,7 @@ final class WidgetBoard extends FrameLayout {
         Context c=getContext();
         switch(id){
             case "upnext":return new UpNextWidget(c,host);
+            case "clock":return new ClockWidget(c,host);
             case "weather":return new WeatherWidget(c,host);
             case "music":return new NowPlayingWidget(c,host);
             case "control":return new ControlWidget(c,host);
