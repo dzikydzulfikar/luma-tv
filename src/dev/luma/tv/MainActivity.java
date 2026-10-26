@@ -843,6 +843,11 @@ public final class MainActivity extends Activity {
         if(house)controls.add(option(list,"Scene apps",()->"Choose",null,this::sceneApps,()->preview(0,"Scene apps","Open an app after a scene — Movie can start Netflix as the lights go down.")));
         controls.add(option(list,"Home screen",()->lumaIsHome()?"Luma":"TV default",null,this::homeScreen,
             ()->preview(0,"Home screen",lumaIsHome()?"Luma opens when you press Home. Choose to return to your TV's own home screen.":"Your TV's own home screen opens when you press Home.")));
+        caption(list,"Controls",false); // were pills beside the clock on Home
+        controls.add(option(list,"Wi-Fi",this::networkState,null,()->openSetting(new Intent(Settings.ACTION_WIFI_SETTINGS)),()->preview(0,"Wi-Fi","The TV's network and its signal. OK opens Wi-Fi settings.")));
+        controls.add(option(list,"Picture & Sound",this::displayMode,null,()->openSetting(new Intent(Settings.ACTION_SOUND_SETTINGS)),()->preview(0,"Picture & Sound","Resolution, HDR, audio output and volume.")));
+        controls.add(option(list,"Accessories",()->"",null,()->openSetting(new Intent("com.google.android.intent.action.CONNECT_INPUT")),()->preview(0,"Accessories","Pair a remote, Bluetooth speaker, headphones or a gamepad.")));
+        controls.add(option(list,"Screensaver",()->"Start now",null,()->openSetting(new Intent("com.google.android.pano.action.SLEEP")),()->preview(0,"Screensaver","Starts the Apple TV aerials now.")));
         caption(list,"System",false);
         controls.add(option(list,"Device settings",()->"",null,()->startActivity(new Intent(Settings.ACTION_SETTINGS)),()->preview(0,"Device settings","Network, picture, sound and accounts.")));
         controls.add(option(list,"Support the author",()->"",null,this::supportScreen,()->preview(0,"Support the author","Luma is free and has no ads. A tip in crypto helps it grow.")));
@@ -850,6 +855,27 @@ public final class MainActivity extends Activity {
         content.setTag(controls);
         preview(THUMBS[wp],WALLPAPERS[wp],"Eight wallpapers, from silver silk to the Milky Way. Silver stays light, day and night.");
         if (focus) root.post(()->controls.get(0).requestFocus());
+    }
+    private void openSetting(Intent intent){try{startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(RuntimeException e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
+    /** Signal strength (not the network's name), or the cable. */
+    @SuppressWarnings("deprecation")
+    private String networkState(){
+        try{
+            android.net.ConnectivityManager cm=(android.net.ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+            android.net.NetworkCapabilities caps=cm.getNetworkCapabilities(cm.getActiveNetwork());
+            if(caps!=null&&caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET))return "Ethernet";
+            if(caps==null||!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI))return "Not connected";
+            if(!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED))return "No internet";
+            android.net.wifi.WifiInfo info=((android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE)).getConnectionInfo();
+            int level=info==null?0:android.net.wifi.WifiManager.calculateSignalLevel(info.getRssi(),4);
+            return new String[]{"Weak","Fair","Good","Excellent"}[Math.max(0,Math.min(3,level))];
+        }catch(RuntimeException e){return "";}
+    }
+    private String displayMode(){
+        try{
+            Display.Mode mode=getWindowManager().getDefaultDisplay().getMode();int h=Math.min(mode.getPhysicalHeight(),mode.getPhysicalWidth());
+            return (h>=2160?"4K":h>=1080?"1080p":h>=720?"720p":h+"p")+" · "+Math.round(mode.getRefreshRate())+" Hz";
+        }catch(RuntimeException e){return "";}
     }
     private void caption(LinearLayout list,String label,boolean first){
         TextView c=text(label,13,ink(0x99),"sans-serif-medium");c.setPadding(px(10),0,0,0);
