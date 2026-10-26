@@ -237,7 +237,8 @@ public final class MainActivity extends Activity {
     }
     /** Colours of the parts that stay across pages: tab bar, clock and the settings scrim. */
     private void paintChrome(){
-        if(tabBar!=null)tabBar.setBackground(shape(light?0x47FFFFFF:0x1FFFFFFF,22));
+        // The tab bar is one translucent capsule with a hairline rim, as on tvOS 26; only the selected tab is opaque.
+        if(tabBar!=null){GradientDrawable bar=shape(light?0x4DFFFFFF:0x1FFFFFFF,22);bar.setStroke(Math.max(1,px(.6f)),light?0x80FFFFFF:0x26FFFFFF);tabBar.setBackground(bar);}
         if(clock!=null){clock.setTextColor(ink(0xF2));shadow(clock,6);}
         if(sceneryShade!=null)sceneryShade.setBackgroundColor(light?0x73F2F2F5:0x80000000);
     }
@@ -259,26 +260,36 @@ public final class MainActivity extends Activity {
             TextView tab = text(titles[i], 14, 0xB3FFFFFF, "sans-serif-medium");
             tab.setPadding(px(17), px(9), px(17), px(9)); tab.setGravity(Gravity.CENTER);
             tab.setFocusable(true); tab.setFocusableInTouchMode(true); tab.setSoundEffectsEnabled(false);
-            tab.setOnClickListener(v -> { sound(); showPage(pages[index], true); });
-            // One pill slides between tabs; leaving the bar it settles, translucent, on the current page.
-            tab.setOnFocusChangeListener((v, focus) -> { if(focus){ moveTabIndicator(true); if(loaded&&!page.equals(pages[index])){ navigationSound(index); showPage(pages[index], false); } } else tab.post(()->{ if(focusedTab()<0) moveTabIndicator(true); }); });
+            tab.setOnClickListener(v -> { sound(); enterContent(index); }); // OK does what Down does
+            // One pill slides between tabs; leaving the bar it settles, translucent, on the current page. Up from
+            // the page lands on its own tab, wherever the geometry would have sent it.
+            tab.setOnFocusChangeListener((v, focus) -> {
+                if(focus){
+                    if(focusFromContent&&index!=pageTab()){root.post(()->tabs.get(pageTab()).requestFocus());return;}
+                    moveTabIndicator(true); if(loaded&&!page.equals(pages[index])){ navigationSound(index); showPage(pages[index], false); }
+                } else tab.post(()->{ if(focusedTab()<0) moveTabIndicator(true); });
+            });
             tab.setOnKeyListener((v,key,e) -> {
-                if (e.getAction()==KeyEvent.ACTION_DOWN && key==KeyEvent.KEYCODE_DPAD_DOWN) {
-                    View widget=index==0&&board!=null?board.first():null;
-                    if (!page.equals(pages[index])) showPage(pages[index], true); else if(widget!=null)widget.requestFocus();else focusFirst();
-                    return true;
-                }
-                return false;
+                if (e.getAction()!=KeyEvent.ACTION_DOWN) return false;
+                if (key==KeyEvent.KEYCODE_DPAD_DOWN) { enterContent(index); return true; }
+                return key==KeyEvent.KEYCODE_DPAD_LEFT&&index==0 || key==KeyEvent.KEYCODE_DPAD_RIGHT&&index==titles.length-1; // the bar ends; it does not wrap
             });
             tabs.add(tab); navigation.addView(tab, new LinearLayout.LayoutParams(-2, px(36)));
         }
-        FrameLayout bar = new FrameLayout(this); bar.setClipChildren(false); tabBar=bar;
+        FrameLayout bar = new FrameLayout(this); bar.setClipChildren(false); bar.setClipToPadding(false); tabBar=bar; // the pill's shadow is not cut at the padding
+        // The pill sits 4 in from every edge of the bar, so its curve runs parallel to the bar's (radius 18 in 22).
         tabIndicatorShape = shape(0x24FFFFFF, 18); tabIndicator = new View(this); tabIndicator.setBackground(tabIndicatorShape);
         bar.addView(tabIndicator, new FrameLayout.LayoutParams(0, px(36), Gravity.CENTER_VERTICAL));
         bar.addView(navigation, new FrameLayout.LayoutParams(-2, -1));
-        bar.setPadding(px(4),px(2),px(4),px(2)); bar.setBackground(shape(0x1FFFFFFF,22));
-        root.addView(bar, pos(-2, 40, 0, 26));
+        navigation.setElevation(px(8)); // the labels stay above the lifted pill; with no background it casts no shadow
+        bar.setPadding(px(4),px(4),px(4),px(4));
+        root.addView(bar, pos(-2, 44, 0, 24));
         bar.post(()->{ bar.setTranslationX((getResources().getDisplayMetrics().widthPixels-bar.getWidth())/2f); moveTabIndicator(false); });
+        root.getViewTreeObserver().addOnGlobalFocusChangeListener((old,now)->{
+            focusFromContent=within(old,content);
+            if(within(now,content)&&!within(now,shelf)){String key=focusKey(now);if(key!=null)lastFocus.put(page,key);else lastFocus.remove(page);lastView.put(page,now);}
+            if(android.util.Log.isLoggable("LumaFocus",android.util.Log.DEBUG))android.util.Log.d("LumaFocus",page+" "+describe(now));
+        });
         clock = text("", 18, 0xF2FFFFFF, "sans-serif-medium"); clock.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL); clock.setLetterSpacing(.01f);
         root.addView(clock, pos(130, 36, 782, 28));
         paintChrome();
@@ -441,6 +452,39 @@ public final class MainActivity extends Activity {
         content.setAlpha(0);content.animate().alpha(1).setDuration(220).setInterpolator(decelerate).withLayer().start();
     }
 
+    /* ---------- focus between the tab bar and the page ---------- */
+    private boolean focusFromContent;
+    private final HashMap<String,String> lastFocus=new HashMap<>();private final HashMap<String,View> lastView=new HashMap<>();
+    private static boolean within(View v,View parent){for(;v!=null&&parent!=null;v=v.getParent() instanceof View?(View)v.getParent():null)if(v==parent)return true;return false;}
+    /** A name for a focused control that survives the page being rebuilt: the app of a tile, else its description. */
+    private static String focusKey(View v){if(v instanceof Tile)return "tile:"+((Tile)v).app.pkg;CharSequence cd=v.getContentDescription();return cd!=null&&cd.length()>0?"cd:"+cd:null;}
+    private String describe(View v){if(v==null)return "none";int t=tabs.indexOf(v);if(t>=0)return "tab:"+((TextView)v).getText();String k=focusKey(v);return k!=null?k:v.getClass().getSimpleName()+"@"+Integer.toHexString(System.identityHashCode(v));}
+    /** Down or OK on a tab: into its page, to the control focused there last, else its first. A page that was just
+     *  built is entered once it is laid out, so a quick press never falls through. */
+    private void enterContent(int index){
+        String target=index==1?"apps":index==2?"settings":"home";
+        if(!page.equals(target))showPage(target,false);
+        whenLaidOut(()->{
+            if(within(getCurrentFocus(),content))return;
+            View v=remembered();
+            if(v!=null&&v.requestFocus())return;
+            v=firstControl();
+            if(v==null||!v.requestFocus())content.requestFocus(View.FOCUS_DOWN);
+        },20);
+    }
+    private void whenLaidOut(Runnable r,int tries){if(tries>0&&(!content.isLaidOut()||content.isLayoutRequested())){content.postDelayed(()->whenLaidOut(r,tries-1),16);return;}r.run();}
+    private View remembered(){
+        String key=lastFocus.get(page);
+        if(key!=null&&key.startsWith("tile:")){for(Tile t:tiles)if(("tile:"+t.app.pkg).equals(key))return t;}
+        else if(key!=null){ArrayList<View> found=new ArrayList<>();content.findViewsWithText(found,key.substring(3),View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION);for(View v:found)if(v.isFocusable()&&v.isShown())return v;}
+        View v=lastView.get(page);return v!=null&&v.isAttachedToWindow()&&v.isShown()&&within(v,content)?v:null;
+    }
+    @SuppressWarnings("unchecked") private View firstControl(){
+        if(page.equals("settings")){Object tag=content.getTag();return tag instanceof ArrayList&&!((ArrayList<View>)tag).isEmpty()?((ArrayList<View>)tag).get(0):null;}
+        View widget=page.equals("home")&&board!=null?board.first():null;if(widget!=null)return widget;
+        for(Tile tile:tiles)if(tile.app.pkg.equals(selectedPackage))return tile;
+        return tiles.isEmpty()?null:tiles.get(0);
+    }
     private void focusFirst() {
         for (Tile tile:tiles) if (tile.app.pkg.equals(selectedPackage)) { tile.requestFocus(); return; }
         if (!tiles.isEmpty()) tiles.get(0).requestFocus();
@@ -586,18 +630,21 @@ public final class MainActivity extends Activity {
         int focused=focusedTab(),index=focused>=0?focused:pageTab();View target=tabs.get(index),row=(View)target.getParent();
         if(target.getWidth()==0){target.post(()->moveTabIndicator(false));return;}
         final float fromX=tabIndicator.getTranslationX(),toX=row.getLeft()+target.getLeft()-((View)row.getParent()).getPaddingLeft();
-        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?(light?0xFF1D1D1F:0xF5FFFFFF):(light?0xE6FFFFFF:0x24FFFFFF);
-        final int[] fromText=new int[tabs.size()],toText=new int[tabs.size()];
-        for(int i=0;i<tabs.size();i++){fromText[i]=((TextView)tabs.get(i)).getCurrentTextColor();toText[i]=i==focused?(light?Color.WHITE:0xFF17202B):ink(i==pageTab()?0xFF:0xA6);}
+        final int fromW=tabIndicator.getLayoutParams().width,toW=target.getWidth(),fromColor=tabColor,toColor=focused>=0?Color.WHITE:(light?0x99FFFFFF:0x33FFFFFF);
+        final float fromZ=tabIndicator.getElevation(),toZ=focused>=0?px(5):0; // focused: opaque white with a soft drop shadow; selected: lighter glass
+        final int onPill=focused>=0?0xFF1D1D1F:ink(0xFF),offPill=ink(0x99);
         if(tabMove!=null)tabMove.cancel();
         ArgbEvaluator argb=new ArgbEvaluator();
         ValueAnimator.AnimatorUpdateListener step=a->{float f=(float)a.getAnimatedValue();
             tabIndicator.setTranslationX(fromX+(toX-fromX)*f);ViewGroup.LayoutParams lp=tabIndicator.getLayoutParams();lp.width=Math.round(fromW+(toW-fromW)*f);tabIndicator.setLayoutParams(lp);
-            tabColor=(int)argb.evaluate(f,fromColor,toColor);tabIndicatorShape.setColor(tabColor);
-            float t=Math.max(0,Math.min(1,(f-.12f)/.3f)); // text flips quickly, so it never matches the pill mid-way
-            for(int i=0;i<tabs.size();i++)((TextView)tabs.get(i)).setTextColor((int)argb.evaluate(t,fromText[i],toText[i]));};
+            tabColor=(int)argb.evaluate(f,fromColor,toColor);tabIndicatorShape.setColor(tabColor);tabIndicator.setElevation(fromZ+(toZ-fromZ)*f);
+            // Each label takes the pill's ink as far as the pill covers it, so text and pill never disagree mid-way.
+            float left=tabIndicator.getTranslationX(),right=left+lp.width;
+            for(int i=0;i<tabs.size();i++){View tab=tabs.get(i);float l=row.getLeft()+tab.getLeft()-((View)row.getParent()).getPaddingLeft(),w=Math.max(1,tab.getWidth());
+                float cover=Math.max(0,Math.min(1,(Math.min(right,l+w)-Math.max(left,l))/w));((TextView)tab).setTextColor((int)argb.evaluate(cover,offPill,onPill));}};
         tabMove=ValueAnimator.ofFloat(0,1);tabMove.addUpdateListener(step);
-        if(!animate||!motion()||fromW==0){tabMove.setDuration(0);}else{tabMove.setDuration(280);tabMove.setInterpolator(ease);}
+        // A critically damped spring: it glides in and settles without overshoot or wobble.
+        if(!animate||!motion()||fromW==0){tabMove.setDuration(0);}else{tabMove.setDuration(420);tabMove.setInterpolator(t->{double w=t*9;return t>=1?1:(float)((1-(1+w)*Math.exp(-w))/(1-10*Math.exp(-9)));});}
         tabMove.start();
     }
     private FrameLayout overlay;private View overlayReturn;private Runnable overlayCancel;
@@ -1047,12 +1094,13 @@ public final class MainActivity extends Activity {
         row.setOnKeyListener((v,key,e)-> {if(e.getAction()==KeyEvent.ACTION_DOWN && key==KeyEvent.KEYCODE_DPAD_UP && parent.getChildAt(1)==row) {tabs.get(2).requestFocus();return true;}return false;});
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,px(44));lp.bottomMargin=px(6);parent.addView(row,lp);return row;
     }
+    /** Back from a page goes up to its tab; Back on the tab bar goes to Home. */
     @Override public void onBackPressed() {
         if (overlay!=null) { closeOverlay(true); return; }
-        if (!page.equals("home")) showPage("home",true);
-        else if (board!=null && board.index>0) {board.showPage(0);tabs.get(0).requestFocus();}
-        else if (scroll!=null && scroll.getScrollY()>0) {scroll.smoothScrollTo(0,0);if(!tiles.isEmpty())tiles.get(0).requestFocus();}
-        else tabs.get(0).requestFocus();
+        int tab=focusedTab();
+        if (tab>=0) { if(tab!=0) tabs.get(0).requestFocus(); return; }
+        if (page.equals("home")) { if(board!=null&&board.index>0) board.showPage(0); if(scroll!=null&&scroll.getScrollY()>0) scrollHome(false); }
+        tabs.get(pageTab()).requestFocus();
     }
 
     private final class Tile extends FrameLayout {
