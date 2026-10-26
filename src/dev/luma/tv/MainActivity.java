@@ -52,6 +52,14 @@ public final class MainActivity extends Activity {
     private boolean house;
     /** Home pages of widgets chosen in Settings (WidgetBoard); homePage is the page shown, kept across rebuilds. */
     private WidgetBoard board;
+    /** Home's top shelf of Windah's streams. */
+    private Shelf shelf;
+    private final Shelf.Host shelfHost=new Shelf.Host(){
+        public void up(){tabs.get(0).requestFocus();}
+        public void down(){focusFirst();}
+        public boolean light(){return light;}
+        public int px(float value){return MainActivity.this.px(value);}
+    };
     private int homePage;
     /** Installed apps by package, replaced as a whole on each discovery: widgets read it from their own threads. */
     private volatile Map<String,App> appIndex=Collections.emptyMap();
@@ -83,7 +91,9 @@ public final class MainActivity extends Activity {
             handler.postDelayed(this, 15000);
         }
     };
-    private static final String[] FIRST = {"com.google.android.youtube.tv", "com.netflix.ninja", "com.amazon.amazonvideo.livingroom", "com.disney.disneyplus", "com.spotify.tv.android", "com.google.android.youtube.tvmusic"};
+    /** The Windah Live card: not an installed app, it opens the channel's live page in the YouTube app. */
+    static final String WINDAH="luma.windah";
+    private static final String[] FIRST = {"com.google.android.youtube.tv", WINDAH, "com.netflix.ninja", "com.apple.atve.androidtv.appletv", "com.amazon.amazonvideo.livingroom", "com.android.vending", "com.android.tv.settings"};
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -118,6 +128,7 @@ public final class MainActivity extends Activity {
         wallpaper.syncAmbient();
         if(houseWidgets!=null)houseWidgets.setActive(board==null||board.onHouse());
         if(board!=null){board.setActive(true);board.refresh();}
+        if(shelf!=null)shelf.refresh();
     }
     @Override protected void onPause() {
         super.onPause(); if(houseWidgets!=null)houseWidgets.setActive(false); if(board!=null)board.setActive(false); started = false; handler.removeCallbacks(clockTick); handler.removeCallbacks(daylightTick);
@@ -181,7 +192,7 @@ public final class MainActivity extends Activity {
     /** Silver shows its light picture between sunrise and sunset and its dark one at night. */
     private int variant(int style){return style==SILVER&&!isDay()?SILVER_NIGHT:style;}
     /** QA: am start -n dev.luma.tv/.MainActivity --es luma.daylight day|night|auto previews either look (not saved). */
-    private String daylightOverride="auto";
+    private String daylightOverride="day"; // always the light look, also after sunset
     private boolean isDay(){return daylightOverride.equals("auto")?daylight.isDay(System.currentTimeMillis()):daylightOverride.equals("day");}
     private static boolean pale(int variant){return variant==SILVER;}
     /** Follows sunrise and sunset: switches Silver's picture and, with it, the colours of the page. */
@@ -229,7 +240,7 @@ public final class MainActivity extends Activity {
             tab.setOnFocusChangeListener((v, focus) -> { if(focus) moveTabIndicator(true); else tab.post(()->{ if(focusedTab()<0) moveTabIndicator(true); }); });
             tab.setOnKeyListener((v,key,e) -> {
                 if (e.getAction()==KeyEvent.ACTION_DOWN && key==KeyEvent.KEYCODE_DPAD_DOWN) {
-                    View widget=index==0&&board!=null?board.first():null;
+                    View widget=index==0&&shelf!=null?shelf.first():index==0&&board!=null?board.first():null;
                     if (!page.equals(pages[index])) showPage(pages[index], true); else if(widget!=null)widget.requestFocus();else focusFirst();
                     return true;
                 }
@@ -272,10 +283,16 @@ public final class MainActivity extends Activity {
                         app.description=descriptionFor(pkg);
                         app.tag=tagFor(pkg);
                         Drawable banner=info.activityInfo.applicationInfo.loadBanner(pm);
-                        if (banner!=null) app.banner=bitmap(banner, 320, 180);
+                        if (banner!=null) app.banner=hd(banner);
                         found.add(app);
                     } catch (RuntimeException ignored) { /* A package can disappear during an update. */ }
                 }
+            }
+            if (seen.contains(Shelf.YOUTUBE)) {
+                App windah=new App(); windah.pkg=WINDAH; windah.label="Windah Live"; windah.color=0xFFFF4B4B; windah.tag="LIVE";
+                windah.description="Windah Basudara, live and recent streams.";
+                windah.banner=BitmapFactory.decodeResource(getResources(),R.drawable.windah_banner); windah.icon=windah.banner;
+                found.add(windah);
             }
             Collections.sort(found, (a,b)->a.label.compareToIgnoreCase(b.label));
             runOnUiThread(() -> {
@@ -288,6 +305,13 @@ public final class MainActivity extends Activity {
         });
     }
 
+    /** An app's banner at its own aspect and at least 640 px wide (a 320x180 dp TV banner is 640x360 on this TV). */
+    private Bitmap hd(Drawable banner) {
+        int w=banner.getIntrinsicWidth(),h=banner.getIntrinsicHeight();
+        if (w<=0 || h<=0) { w=640; h=360; }
+        float scale=Math.max(1f,640f/w);
+        return bitmap(banner, Math.round(w*scale), Math.round(h*scale));
+    }
     private Bitmap bitmap(Drawable drawable, int w, int h) {
         Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
         Canvas c=new Canvas(bitmap); drawable.setBounds(0,0,w,h); drawable.draw(c); return bitmap;
@@ -300,9 +324,11 @@ public final class MainActivity extends Activity {
         for (App app:apps) if (!ids.contains(app.pkg)) ids.add(app.pkg);
         return ids;
     }
+    /** Apps hidden from Home; by default the CleanYourTV launcher, kept installed for its remote-key helper. */
+    private Set<String> hiddenApps(){return prefs.getStringSet("hidden",Collections.singleton("com.gathin.tvhome"));}
     private ArrayList<App> visibleApps(boolean all) {
         ArrayList<App> result=new ArrayList<>();
-        Set<String> hidden=prefs.getStringSet("hidden", Collections.emptySet());
+        Set<String> hidden=hiddenApps();
         for (String id:order()) for (App app:apps) if (app.pkg.equals(id) && (all || !hidden.contains(id))) result.add(app);
         return result;
     }
@@ -315,7 +341,7 @@ public final class MainActivity extends Activity {
         content.animate().cancel();content.setAlpha(1);content.setTranslationX(0);
         if(houseWidgets!=null&&houseWidgets.current!=null)lastHome=houseWidgets.current;
         if(board!=null)homePage=board.index;
-        content.removeAllViews();houseWidgets=null;board=null;content.setTag(null);
+        content.removeAllViews();houseWidgets=null;board=null;shelf=null;content.setTag(null);
         page=next;homeGreeting=page.equals("home");heroPackage=homeGreeting?"@greeting":"";tiles.clear();
         light=pale(variant(wallpaperStyle()));paintChrome();
         clock.setVisibility(prefs.getBoolean("clock", true) ? View.VISIBLE : View.GONE);
@@ -332,10 +358,11 @@ public final class MainActivity extends Activity {
         heroDescription=text(home ? greetingLine() : "Everything installed on this TV.", 16, ink(0xB3), "sans-serif");
         heroDescription.setSingleLine(true); heroDescription.setEllipsize(android.text.TextUtils.TruncateAt.END); shadow(heroDescription,8); hero.addView(heroDescription,pos(home?392:860,22,1,60));
         // Without widgets, the greeting moves down to sit just above the favourites and the wallpaper stays open above it.
-        ArrayList<ArrayList<String>> layout=home?WidgetBoard.pages(prefs,house,!InputsWidget.list(this).isEmpty()):new ArrayList<>();
+        ArrayList<ArrayList<String>> layout=new ArrayList<>(); // no widgets: Home is the top shelf and the apps, as on tvOS
         boolean housePage=false;for(ArrayList<String> p:layout)housePage|=p.contains("house");
         content.addView(hero,pos(864,88,48,home?(!layout.isEmpty()?96:272):100));
         heroKey=home?"@greeting":"";
+        if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost);content.addView(shelf,pos(960,270,0,92));}
         if(home&&housePage){
             houseWidgets=new HouseWidgets(this,unit,new HouseWidgets.Callbacks(){
                 public void up(){tabs.get(0).requestFocus();}
@@ -535,6 +562,7 @@ public final class MainActivity extends Activity {
     }
 
     private void launch(App app) {
+        if (app.pkg.equals(WINDAH)) { sound(); Shelf.open(this,Shelf.CHANNEL+"/live"); remember(app.pkg); return; }
         try {
             Intent intent=getPackageManager().getLeanbackLaunchIntentForPackage(app.pkg);
             if (intent==null) intent=getPackageManager().getLaunchIntentForPackage(app.pkg);
@@ -759,7 +787,7 @@ public final class MainActivity extends Activity {
     }
 
     private void appMenu(App app) {
-        Set<String> hidden=new HashSet<>(prefs.getStringSet("hidden",Collections.emptySet()));
+        Set<String> hidden=new HashSet<>(hiddenApps());
         String[] choices={"Open", "Move to first position", "Move left", "Move right", hidden.contains(app.pkg) ? "Show on Home" : "Hide from Home", "App info"};
         menu(app.label,choices,-1,index-> {
             if (index==0) { launch(app); return; }
@@ -768,7 +796,7 @@ public final class MainActivity extends Activity {
             if (index==2 && current>0) Collections.swap(ids,current,current-1);
             if (index==3 && current<ids.size()-1) Collections.swap(ids,current,current+1);
             if (index==4) { if (hidden.contains(app.pkg)) hidden.remove(app.pkg); else hidden.add(app.pkg); }
-            if (index==5) { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+app.pkg))); return; }
+            if (index==5) { if (app.pkg.equals(WINDAH)) return; startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+app.pkg))); return; }
             prefs.edit().putString("order",String.join(",",ids)).putStringSet("hidden",hidden).apply();
             selectedPackage=app.pkg;showPage(page,true);
         });
@@ -1043,6 +1071,7 @@ public final class MainActivity extends Activity {
                     movement.press(e.getAction()==KeyEvent.ACTION_DOWN);return false;
                 }
                 if(e.getAction()!=KeyEvent.ACTION_DOWN) return false;
+                if(key==KeyEvent.KEYCODE_DPAD_UP && index<6 && page.equals("home") && shelf!=null && shelf.focusCurrent()) return true;
                 if(key==KeyEvent.KEYCODE_DPAD_UP && index<6){
                     int[] l=new int[2];getLocationOnScreen(l);float x=l[0]+getWidth()/2f;
                     View above=!page.equals("home")||board==null?null:board.onHouse()?null:board.nearest(x);
@@ -1113,7 +1142,12 @@ public final class MainActivity extends Activity {
             bounds.set(0,0,w,h);
             p.setColor(app.color);p.setShader(null);c.drawRoundRect(bounds,px(16),px(16),p);
             String pkg=app.pkg;
-            if(pkg.equals("com.google.android.youtube.tv")) {
+            if(app.banner!=null) {
+                // The app's own banner fills the card at its own aspect (cropped a little rather than letterboxed).
+                float ratio=Math.max(w/app.banner.getWidth(),h/app.banner.getHeight());
+                float bw=app.banner.getWidth()*ratio,bh=app.banner.getHeight()*ratio;
+                bounds.set((w-bw)/2,(h-bh)/2,(w+bw)/2,(h+bh)/2);p.setAlpha(255);c.drawBitmap(app.banner,null,bounds,p);
+            } else if(pkg.equals("com.google.android.youtube.tv")) {
                 float cx=w/2,cy=h/2;
                 p.setColor(0xFFFF0033);bounds.set(cx-px(25),cy-px(17),cx+px(25),cy+px(17));c.drawRoundRect(bounds,px(10),px(10),p);
                 p.setColor(Color.WHITE);Path path=new Path();path.moveTo(cx-px(5),cy-px(9));path.lineTo(cx+px(10),cy);path.lineTo(cx-px(5),cy+px(9));path.close();c.drawPath(path,p);
@@ -1142,10 +1176,6 @@ public final class MainActivity extends Activity {
                 needle.reset();needle.moveTo(cx,cy+px(21));needle.lineTo(cx+px(5),cy);needle.lineTo(cx-px(5),cy);needle.close();p.setColor(0xFF42677F);c.drawPath(needle,p);c.restore();
             } else if(pkg.equals("com.google.android.vending") || pkg.equals("com.android.vending")) {
                 drawIcon(c,app.icon,47);
-            } else if(app.banner!=null) {
-                float ratio=Math.min(w/app.banner.getWidth(),h/app.banner.getHeight());
-                float bw=app.banner.getWidth()*ratio,bh=app.banner.getHeight()*ratio;
-                bounds.set((w-bw)/2,(h-bh)/2,(w+bw)/2,(h+bh)/2);p.setAlpha(255);c.drawBitmap(app.banner,null,bounds,p);
             } else drawIcon(c,app.icon,48);
             p.setShader(finish);
             bounds.set(0,0,w,h);c.drawRoundRect(bounds,px(16),px(16),p);p.setShader(null);
