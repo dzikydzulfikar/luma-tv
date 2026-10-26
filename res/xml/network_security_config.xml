@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple serves the aerial films (sylvan.apple.com) with a certificate from its own root, which Android does not
+     ship. Trust that root for this one host only; everything else keeps the system's trust and Luma's existing
+     cleartext setting. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+    <domain-config>
+        <domain includeSubdomains="false">sylvan.apple.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/apple_root_ca" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -131,6 +131,7 @@ public final class MainActivity extends Activity {
         registerReceiver(packages,filter);
         createShell();
         discover();
+        Aerials.ensure(this); // screensaver films download in the background, once, within their cap
     }
 
     @Override protected void onResume() {
