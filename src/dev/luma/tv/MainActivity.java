@@ -158,8 +158,6 @@ public final class MainActivity extends Activity {
             prefs.edit().putString("order",ids.isEmpty()?"":String.join(",",ids)).putBoolean("hbo_front",true).apply();
         }
         if(!prefs.getBoolean("silver_default",false))prefs.edit().putInt("wallpaper",SILVER).putBoolean("silver_default",true).apply();
-        // White Silk (Silver + the "white" backdrop) is Dziky's choice: restored once if another wallpaper was picked.
-        if(!prefs.getBoolean("white_silk_v2",false))prefs.edit().putInt("wallpaper",SILVER).putString("bg","white").putBoolean("white_default",true).putBoolean("white_silk_v2",true).apply();
         light=pale(variant(wallpaperStyle()));
         house=houseInstalled();
         IntentFilter filter=new IntentFilter();filter.addAction(Intent.ACTION_PACKAGE_ADDED);filter.addAction(Intent.ACTION_PACKAGE_REMOVED);filter.addAction(Intent.ACTION_PACKAGE_CHANGED);filter.addDataScheme("package");
@@ -197,7 +195,7 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         String look=intent.getStringExtra("luma.daylight");
-        // luma.daylight (a QA preview of the night look) is gone: Silver stays light, day and night.
+        if(look!=null&&look.matches("day|night|auto")){daylightOverride=look;if(started)syncDaylight();}
         String demo=intent.getStringExtra("luma.demo");if(demo!=null){Promo.on=demo.equals("promo");if(Promo.on)Promo.start();board=null;homePage=0;showPage("home",true);} // board=null: start on the first page
         String clockStyle=intent.getStringExtra("luma.clock"); // a hidden switch between the clock card's looks (ClockWidget)
         if(clockStyle!=null&&clockStyle.matches("[ABCD]")){ClockWidget.style=clockStyle;prefs.edit().putString("clock_style",clockStyle).apply();board=null;homePage=0;showPage("home",true);}
@@ -1437,7 +1435,7 @@ public final class MainActivity extends Activity {
                     BitmapFactory.Options full=new BitmapFactory.Options();full.inPreferredConfig=Bitmap.Config.ARGB_8888;
                     // Silver's day look is one of the generated backdrops (Backdrops, luma.bg); "silk" is the blurred photo.
                     Bitmap photo=style!=SILVER?null:bg.equals("white")?Backdrops.white(MainActivity.this,width,height):bg.equals("mesh")?Backdrops.mesh(width,height):bg.equals("pearl")?Backdrops.pearl(width,height):bg.equals("aerial")?Backdrops.aerial(MainActivity.this,width,height):null;
-                    if(photo==null&&style==SILVER&&!bg.equals("silk")){photo=Backdrops.white(MainActivity.this,width,height);if(photo==null)photo=Backdrops.pearl(width,height);} // aerial not downloaded or an image failed: stay white
+                    if(photo==null&&style==SILVER&&!bg.equals("silk"))photo=Backdrops.mesh(width,height); // no aerial downloaded yet
                     if(photo==null){photo=BitmapFactory.decodeResource(getResources(),PHOTOS[Math.min(PHOTOS.length-1,style-3)],full);if(style>=SILVER)photo=Backdrops.soften(photo);}
                     back=compose(photo,style,false,width,height);photo.recycle();
                     front=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);
