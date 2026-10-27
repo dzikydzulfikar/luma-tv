@@ -56,7 +56,7 @@ public final class MainActivity extends Activity {
     /** Windah's streams, in a row below the first screen of Home, and Recommended for You under it. */
     private Shelf shelf,recommended,history;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=560,SECTION_TOP=62,STRIP=0.4f,STRIP_TOP=14,ROW_STEP=250; // the rows wait below the first screen, out of sight
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=560,SECTION_TOP=58,STRIP=0.4f,STRIP_TOP=14,ROW_STEP=240; // the rows wait below the first screen, out of sight
     private boolean scrolledDown;private int scrollLevel;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
     private void scrollHome(boolean down){scrollHome(down?1:0);}
@@ -70,6 +70,8 @@ public final class MainActivity extends Activity {
         if(scroll!=null){ // the app row rides against the page so it lands as a strip at the top, scaled from its left edge
             scroll.setPivotX(px(50));scroll.setPivotY(px(16));scroll.animate().cancel();
             scroll.animate().translationY(down?-y+px(STRIP_TOP-342):0).scaleX(down?STRIP:1).scaleY(down?STRIP:1).setDuration(ms).setInterpolator(decelerate).start();}
+        // A row moved above the strip fades out on the way, so nothing ever draws behind the app logos.
+        if(shelf!=null){shelf.animate().cancel();shelf.animate().alpha(level==3?0:1).setDuration(level==3?ms/2:ms).setInterpolator(decelerate).withLayer().start();}
         if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
         tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
     }
