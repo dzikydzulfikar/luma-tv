@@ -1417,7 +1417,8 @@ public final class MainActivity extends Activity {
         /** Shows a wallpaper without saving it (the picker previews live). Silver resolves to its day or night picture. */
         String requestedBg="";
         void show(final int choice) {
-            final int style=variant(choice);final String bg=prefs.getString("bg","mesh");
+            if(!prefs.getBoolean("bg_satin_default",false))prefs.edit().putString("bg","satin").putBoolean("bg_satin_default",true).apply(); // Satin Glow replaces the mesh once
+            final int style=variant(choice);final String bg=prefs.getString("bg","satin");
             if(requestedStyle==style&&requestedBg.equals(bg))return;
             requestedStyle=style;requestedBg=bg;
             final int width=getResources().getDisplayMetrics().widthPixels;
@@ -1428,7 +1429,7 @@ public final class MainActivity extends Activity {
                     // Photographic and rendered wallpapers: one full-height layer, no cut-out terrain.
                     BitmapFactory.Options full=new BitmapFactory.Options();full.inPreferredConfig=Bitmap.Config.ARGB_8888;
                     // Silver's day look is one of the generated backdrops (Backdrops, luma.bg); "silk" is the blurred photo.
-                    Bitmap photo=style!=SILVER?null:bg.equals("mesh")?Backdrops.mesh(width,height):bg.equals("pearl")?Backdrops.pearl(width,height):bg.equals("aerial")?Backdrops.aerial(MainActivity.this,width,height):null;
+                    Bitmap photo=style!=SILVER?null:bg.equals("satin")?Backdrops.satin(MainActivity.this,width,height):bg.equals("mesh")?Backdrops.mesh(width,height):bg.equals("pearl")?Backdrops.pearl(width,height):bg.equals("aerial")?Backdrops.aerial(MainActivity.this,width,height):null;
                     if(photo==null&&style==SILVER&&!bg.equals("silk"))photo=Backdrops.mesh(width,height); // no aerial downloaded yet
                     if(photo==null){photo=BitmapFactory.decodeResource(getResources(),PHOTOS[Math.min(PHOTOS.length-1,style-3)],full);if(style>=SILVER)photo=Backdrops.soften(photo);}
                     back=compose(photo,style,false,width,height);photo.recycle();

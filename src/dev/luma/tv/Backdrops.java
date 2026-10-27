@@ -7,13 +7,20 @@ import android.media.MediaMetadataRetriever;
 /** Calm, bright backdrops for the pale wallpaper, made once on the TV (off the UI thread) as still bitmaps, so they
  *  cost nothing per frame. Chosen with a hidden switch while the look settles:
  *    adb shell am start -n dev.luma.tv/.MainActivity --es luma.bg mesh|aerial|pearl|silk
+ *  satin  Satin Glow, white satin folds (an image we generated), the default
  *  mesh   warm white melting into cool light blue and lilac, a few wide colour blobs; it drifts imperceptibly
  *  aerial a frame of a downloaded Apple TV aerial (Hawaii), heavily blurred and lifted towards white
  *  pearl  a near-white pearl gradient with one warm glow from the top and a cool shade low on the right
  *  silk   the Silver silk photo, blurred (the previous look) */
 final class Backdrops {
-    static final String[] NAMES={"mesh","aerial","pearl","silk"};
+    static final String[] NAMES={"satin","mesh","aerial","pearl","silk"};
 
+    /** Satin Glow, decoded once straight to the screen's size: a still bitmap, no extra layer per frame. */
+    static Bitmap satin(Context c,int w,int h){
+        BitmapFactory.Options o=new BitmapFactory.Options();o.inPreferredConfig=Bitmap.Config.ARGB_8888;o.inScaled=false;
+        Bitmap b=BitmapFactory.decodeResource(c.getResources(),R.drawable.bg_satin,o);if(b==null)return null;
+        if(b.getWidth()==w&&b.getHeight()==h)return b;Bitmap s=Bitmap.createScaledBitmap(b,w,h,true);b.recycle();return s;
+    }
     static Bitmap mesh(int w,int h){
         Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(b);Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.DITHER_FLAG);
         c.drawColor(0xFFF8F6F3);
