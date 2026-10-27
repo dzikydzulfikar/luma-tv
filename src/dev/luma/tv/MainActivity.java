@@ -71,7 +71,7 @@ public final class MainActivity extends Activity {
             scroll.setPivotX(px(50));scroll.setPivotY(px(16));scroll.animate().cancel();
             scroll.animate().translationY(down?-y+px(STRIP_TOP-342):0).scaleX(down?STRIP:1).scaleY(down?STRIP:1).setDuration(ms).setInterpolator(decelerate).start();}
         // A row moved above the strip fades out on the way, so nothing ever draws behind the app logos.
-        if(shelf!=null){shelf.animate().cancel();shelf.animate().alpha(level==3?0:1).setDuration(level==3?ms/2:ms).setInterpolator(decelerate).withLayer().start();}
+        if(shelf!=null){shelf.animate().cancel();shelf.animate().alpha(level==3?0:1).setDuration(level==3?ms/4:ms).setInterpolator(decelerate).withLayer().start();}
         if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
         tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
     }
