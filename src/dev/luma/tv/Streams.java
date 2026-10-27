@@ -54,6 +54,34 @@ final class Streams {
         }
         return list;
     }
+
+    private static final Pattern AGE=Pattern.compile("\"content\":\"(\\d+)\\s*(detik|menit|jam|hari|mgg|minggu|bln|bulan|thn|tahun|seconds?|minutes?|hours?|days?|weeks?|months?|years?|min|mo|s|m|h|d|w|y)\\s*(?:lalu|ago)\"");
+    private static final Pattern OG_TITLE=Pattern.compile("<meta property=\"og:title\" content=\"([^\"]*)\"");
+    /** A channel's /videos page, the fallback when YouTube's RSS feeds fail (they answered 404 in October 2026): its
+     *  newest uploads with the channel's name. The page only says how long ago each was posted ("3 mgg lalu",
+     *  "2 days ago"), so published is that age taken from now: close enough to sort the row newest first. */
+    static List<Video> parseUploads(String html,int max,long now){
+        ArrayList<Video> list=new ArrayList<>();HashSet<String> seen=new HashSet<>();
+        Matcher og=OG_TITLE.matcher(html);String channel=og.find()?xml(og.group(1)):null;
+        String[] parts=html.split("\"lockupViewModel\":\\{");
+        for(int i=1;i<parts.length&&list.size()<max;i++){
+            String p=parts[i];Matcher id=ID.matcher(p),title=TITLE.matcher(p),badge=BADGE.matcher(p),age=AGE.matcher(p);
+            if(!id.find()||!title.find()||!seen.add(id.group(1)))continue;
+            String text=badge.find()?unescape(badge.group(1)):"";if(!text.matches("[0-9][0-9.:]*"))continue; // live or upcoming: not an upload yet
+            Video v=new Video();v.id=id.group(1);v.title=unescape(title.group(1));v.channel=channel;v.thumb="https://i.ytimg.com/vi/"+v.id+"/hqdefault.jpg";
+            if(age.find())v.published=now-Long.parseLong(age.group(1))*unit(age.group(2));
+            list.add(v);
+        }
+        return list;
+    }
+    private static long unit(String u){
+        long m=60_000L,h=60*m,d=24*h;
+        switch(u){case "s":return 1000;case "m":case "min":return m;case "h":return h;case "d":return d;case "w":return 7*d;case "mo":return 30*d;case "y":return 365*d;} // "2d ago"
+        if(u.startsWith("detik")||u.startsWith("second"))return 1000;if(u.startsWith("menit")||u.startsWith("minute"))return m;
+        if(u.startsWith("jam")||u.startsWith("hour"))return h;if(u.startsWith("hari")||u.startsWith("day"))return d;
+        if(u.startsWith("m")||u.startsWith("week"))return 7*d; // mgg, minggu
+        if(u.startsWith("b")||u.startsWith("month"))return 30*d;return 365*d;
+    }
     /** An RSS timestamp such as 2026-10-20T16:00:06+00:00, in epoch milliseconds (0 if unreadable). */
     static long time(String iso){
         try{java.text.SimpleDateFormat f=new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",java.util.Locale.ROOT);return f.parse(iso.trim()).getTime();}catch(Exception e){return 0;}

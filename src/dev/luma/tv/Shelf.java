@@ -76,8 +76,11 @@ final class Shelf extends FrameLayout {
         bind();
     }
 
-    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();attached=true;refresh();}
-    @Override protected void onDetachedFromWindow(){attached=false;super.onDetachedFromWindow();}
+    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();attached=true;refresh();main.postDelayed(tick,TICK);}
+    @Override protected void onDetachedFromWindow(){attached=false;main.removeCallbacks(tick);super.onDetachedFromWindow();}
+    /** Home can sit at rest for hours without a resume: check freshness every half hour while the row is on screen. */
+    private static final long TICK=30*60*1000L;
+    private final Runnable tick=new Runnable(){public void run(){if(!attached)return;refresh();main.postDelayed(this,TICK);}};
 
     /** Fetches again when the list is older than the Source allows (Home calls this on resume). */
     private int boundVersion=-1;
@@ -92,7 +95,7 @@ final class Shelf extends FrameLayout {
             final List<Streams.Video> found=list;
             main.post(()->{
                 s.fetching=false;s.fetched=System.currentTimeMillis(); // also after a failure: offline, try again later
-                if(found.isEmpty())return;
+                android.util.Log.i("LumaShelf",s.key+" refreshed: "+found.size()+" videos");if(found.isEmpty())return;
                 s.videos=found;save(app,s);if(attached)bind();
             });
         });
@@ -198,7 +201,7 @@ final class Shelf extends FrameLayout {
     static HttpURLConnection connect(String url)throws IOException{
         HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(8000);c.setReadTimeout(10000);
         c.setRequestProperty("User-Agent","Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
-        c.setRequestProperty("Accept-Language","id-ID,id;q=0.9");c.setRequestProperty("Cookie","SOCS=CAI; CONSENT=YES+1");
+        c.setRequestProperty("Accept-Language","en-US,en;q=0.9"); // English: YouTube otherwise auto-translates titlesc.setRequestProperty("Cookie","SOCS=CAI; CONSENT=YES+1");
         return c;
     }
     static String get(String url)throws IOException{

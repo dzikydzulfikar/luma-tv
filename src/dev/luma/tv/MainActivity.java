@@ -56,14 +56,15 @@ public final class MainActivity extends Activity {
     /** Windah's streams, in a row below the first screen of Home, and Recommended for You under it. */
     private Shelf shelf,recommended,history;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=560,SCROLL=342,ROW_STEP=250; // the rows wait below the first screen, out of sight
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=560,SECTION_TOP=34,ROW_STEP=250; // the rows wait below the first screen, out of sight
     private boolean scrolledDown;private int scrollLevel;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
     private void scrollHome(boolean down){scrollHome(down?1:0);}
-    /** Level 0: the first screen; 1: Windah's row (Recommended peeks below); 2: Recommended for You; 3: History. */
+    /** Level 0: the first screen. 1 and 2: the rows below as a page of their own, Windah's row at the top of the screen and
+     *  Recommended for You whole under it; 3: History, the page moved up one row so Recommended stays above it. */
     private void scrollHome(int level){
-        if(level==scrollLevel||!page.equals("home"))return;scrollLevel=level;boolean down=level>0;scrolledDown=down;
-        float y=level==0?0:-px(SCROLL+(level-1)*ROW_STEP);long ms=motion()?420:0;
+        if(level==scrollLevel||!page.equals("home"))return;int from=scrollLevel;scrollLevel=level;boolean down=level>0;scrolledDown=down;
+        float y=level==0?0:-px(SHELF_Y-SECTION_TOP+(level==3?ROW_STEP:0));long ms=motion()?(from>0&&level>0?380:520):0; // a whole page glides a little longer than a row
         content.animate().cancel();content.animate().translationY(y).setDuration(ms).setInterpolator(decelerate).start();
         if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
         tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
