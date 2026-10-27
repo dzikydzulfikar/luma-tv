@@ -167,8 +167,13 @@ final class Shelf extends FrameLayout {
         image.setTag(video.id);
         net.execute(()->{
             Bitmap b=null;
+            // Decoded at about the card's size: a 1280x720 thumbnail on a 544x306 card cost texture memory and upload time.
             try{HttpURLConnection con=connect(video.thumb);BitmapFactory.Options o=new BitmapFactory.Options();o.inPreferredConfig=Bitmap.Config.RGB_565;
-                try(InputStream in=con.getInputStream()){b=BitmapFactory.decodeStream(in,null,o);}}catch(Exception ignored){}
+                byte[] data;try(InputStream in=con.getInputStream()){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buf=new byte[16384];int n;while((n=in.read(buf))>0)out.write(buf,0,n);data=out.toByteArray();}
+                o.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,o);
+                int want=host.px(272);o.inSampleSize=1;while(o.outWidth/(o.inSampleSize*2)>=want)o.inSampleSize*=2;o.inJustDecodeBounds=false;
+                b=BitmapFactory.decodeByteArray(data,0,data.length,o);
+                if(b!=null&&b.getWidth()>want*1.25f){Bitmap s=Bitmap.createScaledBitmap(b,want,Math.round(b.getHeight()*(want/(float)b.getWidth())),true);b.recycle();b=s;}}catch(Exception ignored){}
             final Bitmap done=b;
             main.post(()->{if(done==null)return;thumbs.put(video.id,done);if(video.id.equals(image.getTag()))image.setImageBitmap(done);});
         });
