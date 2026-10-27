@@ -66,14 +66,27 @@ public final class MainActivity extends Activity {
     private void scrollHome(int level){
         if(level==scrollLevel||!page.equals("home"))return;int from=scrollLevel;scrollLevel=level;boolean down=level>0;scrolledDown=down;
         float y=level==0?0:-px(SHELF_Y-SECTION_TOP+(level==3?ROW_STEP:0));long ms=motion()?(from>0&&level>0?380:520):0; // a whole page glides a little longer than a row
-        content.animate().cancel();content.animate().translationY(y).setDuration(ms).setInterpolator(decelerate).start();
+        content.animate().cancel();clipRows(true);
+        // The rows are clipped just below the strip every frame of the glide (back up too), so nothing ever draws behind the app logos.
+        ViewPropertyAnimator glide=content.animate().translationY(y).setDuration(ms).setInterpolator(decelerate).setUpdateListener(a->clipRows(true));
+        glide.withEndAction(()->{content.animate().setUpdateListener(null);if(scrollLevel==0)clipRows(false);}).start();
         if(scroll!=null){ // the app row rides against the page so it lands as a strip at the top, scaled from its left edge
             scroll.setPivotX(px(50));scroll.setPivotY(px(16));scroll.animate().cancel();
             scroll.animate().translationY(down?-y+px(STRIP_TOP-342):0).scaleX(down?STRIP:1).scaleY(down?STRIP:1).setDuration(ms).setInterpolator(decelerate).start();}
-        // A row moved above the strip fades out on the way, so nothing ever draws behind the app logos.
-        if(shelf!=null){shelf.animate().cancel();shelf.animate().alpha(level==3?0:1).setDuration(level==3?ms/4:ms).setInterpolator(decelerate).withLayer().start();}
         if(board!=null){board.animate().cancel();board.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).withLayer().start();}
         tabBar.animate().cancel();tabBar.animate().alpha(down?0:1).setDuration(ms).setInterpolator(decelerate).start();
+    }
+    private final Rect rowClip=new Rect();
+    /** Cuts each row off where the strip ends (no layer, just clip bounds); at rest nothing is clipped. */
+    private void clipRows(boolean on){
+        int edge=px(STRIP_TOP+TILE_H*STRIP+6);
+        for(Shelf s:new Shelf[]{shelf,recommended,history}){
+            if(s==null)continue;
+            if(!on){if(s.getClipBounds()!=null)s.setClipBounds(null);continue;}
+            int top=Math.max(0,Math.round(edge-(s.getTop()+content.getTranslationY())));
+            if(top>=s.getHeight()){top=s.getHeight();}
+            rowClip.set(-px(40),top,s.getWidth()+px(40),s.getHeight()+px(40));s.setClipBounds(rowClip);
+        }
     }
     private final Shelf.Host shelfHost=new Shelf.Host(){
         public void up(){scrollHome(false);focusFirst();}
