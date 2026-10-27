@@ -54,13 +54,13 @@ public final class MainActivity extends Activity {
     /** Home pages of widgets chosen in Settings (WidgetBoard); homePage is the page shown, kept across rebuilds. */
     private WidgetBoard board;
     /** Windah's streams, in a row below the first screen of Home, and Recommended for You under it. */
-    private Shelf shelf,recommended;
+    private Shelf shelf,recommended,history;
     /** Icon size (design units, 5:3 like tvOS), its corner radius, and where the streams row sits (off screen). */
-    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=478,SCROLL=260,ROW_STEP=250; // Windah's heading and a strip of its cards peek at the bottom
+    private static final float TILE_W=150,TILE_H=90,RADIUS=12,SHELF_Y=560,SCROLL=342,ROW_STEP=250; // the rows wait below the first screen, out of sight
     private boolean scrolledDown;private int scrollLevel;
     /** Down from the apps to Windah's row and back: Home glides up as one piece, the cards and tabs fade, like tvOS. */
     private void scrollHome(boolean down){scrollHome(down?1:0);}
-    /** Level 0: the first screen; 1: Windah's row (Recommended peeks below); 2: Recommended for You. */
+    /** Level 0: the first screen; 1: Windah's row (Recommended peeks below); 2: Recommended for You; 3: History. */
     private void scrollHome(int level){
         if(level==scrollLevel||!page.equals("home"))return;scrollLevel=level;boolean down=level>0;scrolledDown=down;
         float y=level==0?0:-px(SCROLL+(level-1)*ROW_STEP);long ms=motion()?420:0;
@@ -70,12 +70,18 @@ public final class MainActivity extends Activity {
     }
     private final Shelf.Host shelfHost=new Shelf.Host(){
         public void up(){scrollHome(false);focusFirst();}
-        public void down(){if(recommended!=null&&!recommended.empty()&&recommended.focusCurrent())scrollHome(2);}
+        public void down(){if(recommended!=null&&!recommended.empty()&&recommended.focusCurrent())scrollHome(2);else if(history!=null&&!history.empty()&&history.focusCurrent())scrollHome(3);}
         public boolean light(){return light;}
         public int px(float value){return MainActivity.this.px(value);}
     };
     private final Shelf.Host recommendedHost=new Shelf.Host(){
         public void up(){if(shelf!=null&&shelf.focusCurrent())scrollHome(1);}
+        public void down(){if(history!=null&&!history.empty()&&history.focusCurrent())scrollHome(3);}
+        public boolean light(){return light;}
+        public int px(float value){return MainActivity.this.px(value);}
+    };
+    private final Shelf.Host historyHost=new Shelf.Host(){
+        public void up(){if(recommended!=null&&!recommended.empty()&&recommended.focusCurrent())scrollHome(2);else if(shelf!=null&&shelf.focusCurrent())scrollHome(1);}
         public void down(){}
         public boolean light(){return light;}
         public int px(float value){return MainActivity.this.px(value);}
@@ -166,7 +172,7 @@ public final class MainActivity extends Activity {
         wallpaper.syncAmbient();
         if(houseWidgets!=null)houseWidgets.setActive(board==null||board.onHouse());
         if(board!=null){board.setActive(true);board.refresh();}
-        if(shelf!=null)shelf.refresh();if(recommended!=null)recommended.refresh();
+        if(shelf!=null)shelf.refresh();if(recommended!=null)recommended.refresh();if(history!=null)history.refresh();
     }
     @Override protected void onPause() {
         super.onPause(); if(houseWidgets!=null)houseWidgets.setActive(false); if(board!=null)board.setActive(false); started = false; handler.removeCallbacks(clockTick); handler.removeCallbacks(daylightTick);
@@ -318,7 +324,7 @@ public final class MainActivity extends Activity {
         bar.post(()->{ bar.setTranslationX((getResources().getDisplayMetrics().widthPixels-bar.getWidth())/2f); moveTabIndicator(false); });
         root.getViewTreeObserver().addOnGlobalFocusChangeListener((old,now)->{
             focusFromContent=within(old,content);
-            if(within(now,content)&&!within(now,shelf)&&!within(now,recommended)){String key=focusKey(now);if(key!=null)lastFocus.put(page,key);else lastFocus.remove(page);lastView.put(page,now);}
+            if(within(now,content)&&!within(now,shelf)&&!within(now,recommended)&&!within(now,history)){String key=focusKey(now);if(key!=null)lastFocus.put(page,key);else lastFocus.remove(page);lastView.put(page,now);}
             if(android.util.Log.isLoggable("LumaFocus",android.util.Log.DEBUG))android.util.Log.d("LumaFocus",page+" "+describe(now));
         });
         clock = text("", 18, 0xF2FFFFFF, "sans-serif-medium"); clock.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL); clock.setLetterSpacing(.01f);
@@ -406,7 +412,7 @@ public final class MainActivity extends Activity {
         content.animate().cancel();content.setAlpha(1);content.setTranslationX(0);content.setTranslationY(0);scrolledDown=false;tabBar.animate().cancel();tabBar.setAlpha(1);
         if(houseWidgets!=null&&houseWidgets.current!=null)lastHome=houseWidgets.current;
         if(board!=null)homePage=board.index;
-        content.removeAllViews();houseWidgets=null;board=null;shelf=null;recommended=null;scrollLevel=0;content.setTag(null);
+        content.removeAllViews();houseWidgets=null;board=null;shelf=null;recommended=null;history=null;scrollLevel=0;content.setTag(null);
         page=next;homeGreeting=page.equals("home");heroPackage=homeGreeting?"@greeting":"";tiles.clear();
         light=pale(variant(wallpaperStyle()));paintChrome();
         clock.setVisibility(prefs.getBoolean("clock", true) && !page.equals("home") ? View.VISIBLE : View.GONE); // Home has its own clock card
@@ -430,7 +436,8 @@ public final class MainActivity extends Activity {
         content.addView(hero,pos(864,88,48,home?(!layout.isEmpty()?96:272):100));
         heroKey=home?"@greeting":"";
         if(home){hero.setVisibility(View.GONE);shelf=new Shelf(this,shelfHost,Shelf.WINDAH);content.addView(shelf,pos(960,240,0,SHELF_Y));
-            recommended=new Shelf(this,recommendedHost,Shelf.RECOMMENDED);content.addView(recommended,pos(960,240,0,SHELF_Y+ROW_STEP));}
+            recommended=new Shelf(this,recommendedHost,Shelf.RECOMMENDED);content.addView(recommended,pos(960,240,0,SHELF_Y+ROW_STEP));
+            history=new Shelf(this,historyHost,Shelf.HISTORY);content.addView(history,pos(960,240,0,SHELF_Y+2*ROW_STEP));}
         if(home&&housePage){
             houseWidgets=new HouseWidgets(this,unit,new HouseWidgets.Callbacks(){
                 public void up(){tabs.get(0).requestFocus();}
@@ -457,7 +464,7 @@ public final class MainActivity extends Activity {
         rows=new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL); rows.setClipChildren(false); rows.setClipToPadding(false);
         rows.setPadding(px(48),px(home?16:10),px(48),px(30));
         scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
-        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 314 : 200));
+        content.addView(scroll,pos(960, home ? 150 : 330,0,home ? 326 : 200));
         ArrayList<App> list=visibleApps(!home);
         if (!loaded) {
             rows.addView(text("Finding your apps…",15,ink(0xBB),"sans-serif"));

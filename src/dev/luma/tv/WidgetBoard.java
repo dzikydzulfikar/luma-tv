@@ -14,7 +14,7 @@ import java.util.concurrent.*;
  *  this board. The favourites stay below every page. Left and Right past the last control of a page turn the page;
  *  focus moves inside a page with the platform's FocusFinder, limited to that page. */
 final class WidgetBoard extends FrameLayout {
-    static final float W=960,H=392,X=48,ROW_Y=120,ROW_H=186,ROW_W=864,GAP=16,DOTS_Y=380;
+    static final float W=960,H=392,X=48,ROW_Y=132,ROW_H=186,ROW_W=864,GAP=16,DOTS_Y=380;
     /** Every widget, in the default order. */
     static final String[] IDS={"house","upnext","weather","inputs","control","music"};
     /** Widgets do their network and disk work here, away from the launcher's own loader (wallpapers, apps). */

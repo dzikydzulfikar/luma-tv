@@ -26,7 +26,7 @@ final class Shelf extends FrameLayout {
     /** Where a row's videos come from, and what is known of them; it outlives the rows Home rebuilds. */
     static final class Source {
         final String key;final long fresh;final Fetch fetch;final boolean channelLine;
-        List<Streams.Video> videos=new ArrayList<>();long fetched;boolean fetching,loaded;
+        List<Streams.Video> videos=new ArrayList<>();long fetched;boolean fetching,loaded;int version;
         Source(String key,long fresh,boolean channelLine,Fetch fetch){this.key=key;this.fresh=fresh;this.channelLine=channelLine;this.fetch=fetch;}
     }
     static final String YOUTUBE="com.google.android.youtube.tv";
@@ -40,6 +40,17 @@ final class Shelf extends FrameLayout {
         if(list.isEmpty())list=Streams.parseFeed(get(FEED),MAX);
         return list;});
     static final Source RECOMMENDED=new Source("recommended",Recommended.FRESH,true,Recommended::fetch);
+    /** History: the videos opened from these rows, on this TV only (never fetched; remember() writes it). */
+    static final Source HISTORY=new Source("history",Long.MAX_VALUE,true,c->new ArrayList<>());
+    private static final int HISTORY_MAX=15;
+    /** Puts a video first in History, once, and keeps the newest HISTORY_MAX. */
+    static void remember(Context c,Streams.Video video,String channel){
+        Source h=HISTORY;if(!h.loaded){h.loaded=true;load(c,h);}
+        Streams.Video v=new Streams.Video();v.id=video.id;v.title=video.title;v.thumb=video.thumb;v.channel=video.channel!=null?video.channel:channel;v.published=System.currentTimeMillis();
+        ArrayList<Streams.Video> list=new ArrayList<>();list.add(v);
+        for(Streams.Video o:h.videos)if(!o.id.equals(v.id)&&list.size()<HISTORY_MAX)list.add(o);
+        h.videos=list;h.version++;save(c,h);
+    }
     private static final LruCache<String,Bitmap> thumbs=new LruCache<>(40);
     private static final ExecutorService net=Executors.newSingleThreadExecutor();
     private static final Handler main=new Handler(Looper.getMainLooper());
@@ -69,8 +80,10 @@ final class Shelf extends FrameLayout {
     @Override protected void onDetachedFromWindow(){attached=false;super.onDetachedFromWindow();}
 
     /** Fetches again when the list is older than the Source allows (Home calls this on resume). */
+    private int boundVersion=-1;
     void refresh(){
         Source s=source;
+        if(boundVersion!=s.version&&attached)bind(); // History changed while an app was open
         if(s.fetching||System.currentTimeMillis()-s.fetched<s.fresh)return;
         s.fetching=true;Context app=getContext().getApplicationContext();
         net.execute(()->{
@@ -91,9 +104,10 @@ final class Shelf extends FrameLayout {
     boolean focusCurrent(){View f=first();if(f==null)return false;f.requestFocus();return true;}
 
     private void bind(){
+        boundVersion=source.version;
         boolean hadFocus=row.hasFocus();row.removeAllViews();List<Streams.Video> videos=source.videos;
         if(source==WINDAH){boolean live=!videos.isEmpty()&&videos.get(0).live;heading.setText(live?"Windah Basudara · Live now":"Windah Basudara · Recent streams");}
-        else heading.setText("Recommended for You");
+        else heading.setText(source==HISTORY?"History":"Recommended for You");
         heading.setTextColor(host.light()?0xCC1D1D1F:0xDDFFFFFF);
         setVisibility(empty()?INVISIBLE:VISIBLE);
         if(videos.isEmpty()){if(source==WINDAH)addCard(null,0);}
@@ -131,7 +145,9 @@ final class Shelf extends FrameLayout {
             face.animate().scaleX(s).scaleY(s).translationY(f?-host.px(3):0).translationZ(f?host.px(10):0).setDuration(f?260:200).setInterpolator(EASE).withLayer().start();
             if(f)glide(v);
         });
-        card.setOnClickListener(v->open(video==null?CHANNEL+"/streams":"https://www.youtube.com/watch?v="+video.id));
+        card.setOnClickListener(v->{
+            if(video!=null)remember(getContext().getApplicationContext(),video,source==WINDAH?"Windah Basudara":null);
+            open(video==null?CHANNEL+"/streams":"https://www.youtube.com/watch?v="+video.id);});
         card.setOnKeyListener((v,key,e)->{
             if(e.getAction()!=KeyEvent.ACTION_DOWN)return false;
             if(key==KeyEvent.KEYCODE_DPAD_UP){host.up();return true;}
